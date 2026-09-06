@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "limbusexplore:item/placeholder_item"
+  }
+}
