@@ -23,8 +23,20 @@ public final class EgoReleaseClient {
         }
 
         EgoApi.ReleaseResult result = EgoApi.ReleaseResult.values()[resultOrdinal];
-        if (result == EgoApi.ReleaseResult.RELEASED) {
-            // 先给个反馈：actionbar + 一圈粒子，正式特效后面替换
+        if (result == EgoApi.ReleaseResult.CORRODED) {
+            // 侵蚀释放：红色火焰粒子 + 提示
+            minecraft.player.displayClientMessage(
+                    Component.translatable("ego.limbusexplore.corroded",
+                            Component.translatable(ego.displayKey())), true);
+            for (int i = 0; i < 14; i++) {
+                double spread = minecraft.player.getRandom().nextGaussian() * 0.45;
+                minecraft.player.level().addParticle(ParticleTypes.SOUL_FIRE_FLAME,
+                        minecraft.player.getX() + spread,
+                        minecraft.player.getY() + 1.4 + minecraft.player.getRandom().nextGaussian() * 0.4,
+                        minecraft.player.getZ() + spread, 0, 0.15, 0);
+            }
+        } else if (result == EgoApi.ReleaseResult.RELEASED) {
+            // 普通释放：actionbar + 一圈粒子
             minecraft.player.displayClientMessage(
                     Component.translatable("ego.limbusexplore.released",
                             Component.translatable(ego.displayKey())), true);
@@ -35,6 +47,9 @@ public final class EgoReleaseClient {
                         minecraft.player.getY() + 1.6 + minecraft.player.getRandom().nextGaussian() * 0.2,
                         minecraft.player.getZ() + spread, 0, 0.1, 0);
             }
+        } else if (result == EgoApi.ReleaseResult.IN_EGO_STATE) {
+            minecraft.player.displayClientMessage(
+                    Component.translatable("ego.limbusexplore.in_ego_state"), true);
         } else if (result == EgoApi.ReleaseResult.SANITY_LACK) {
             minecraft.player.displayClientMessage(
                     Component.translatable("ego.limbusexplore.sanity_lack",

@@ -15,7 +15,7 @@ import java.util.Optional;
 // 协议有破坏性变更（改包号/双向/互相不兼容）时把 PROTOCOL 的 "1" 改成 "2"，否则两边对不上不报错。
 public final class ModNetworking {
 
-    private static final String PROTOCOL = "1";
+    private static final String PROTOCOL = "2";
 
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(LimbusExplore.MODID, "main"),
@@ -38,6 +38,9 @@ public final class ModNetworking {
                 Optional.of(NetworkDirection.PLAY_TO_SERVER));
         CHANNEL.registerMessage(nextId++, EgoReleaseResultPacket.class,
                 EgoReleaseResultPacket::encode, EgoReleaseResultPacket::decode, EgoReleaseResultPacket::handle,
+                Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(nextId++, EgoStateSyncPacket.class,
+                EgoStateSyncPacket::encode, EgoStateSyncPacket::decode, EgoStateSyncPacket::handle,
                 Optional.of(NetworkDirection.PLAY_TO_CLIENT));
     }
 

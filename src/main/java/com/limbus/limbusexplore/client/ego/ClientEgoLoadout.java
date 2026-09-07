@@ -10,6 +10,8 @@ public final class ClientEgoLoadout {
     public static final int SLOTS = 5;
 
     private static final Ego[] EQUIPPED = new Ego[SLOTS];
+    // 每个槽的待发形态：true = 已长按切到侵蚀态（右键取消），释放时按这个走
+    private static final boolean[] CORRODED = new boolean[SLOTS];
 
     // 已装备列表的缓存，渲染每帧都用它；装备一变就置脏重算
     private static Ego[] cachedList = new Ego[0];
@@ -20,6 +22,15 @@ public final class ClientEgoLoadout {
 
     public static Ego get(int slot) {
         return EQUIPPED[slot];
+    }
+
+    public static boolean isCorroded(int slot) {
+        return CORRODED[slot];
+    }
+
+    // 释放界面长按切换侵蚀态、右键取消都走这里（改不了装备本身，只改形态）
+    public static void setCorroded(int slot, boolean corroded) {
+        CORRODED[slot] = corroded;
     }
 
     /** 槽位对应的固定等级，槽 0..4 → ZAYIN..ALEPH。 */
@@ -39,15 +50,18 @@ public final class ClientEgoLoadout {
         for (int i = 0; i < SLOTS; i++) {
             if (EQUIPPED[i] == ego) {
                 EQUIPPED[i] = null;
+                CORRODED[i] = false;
             }
         }
         EQUIPPED[slot] = ego;
+        CORRODED[slot] = false;
         dirty = true;
         return true;
     }
 
     public static void unequip(int slot) {
         EQUIPPED[slot] = null;
+        CORRODED[slot] = false;
         dirty = true;
     }
 

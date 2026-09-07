@@ -86,4 +86,34 @@ public final class SinApi {
         PlayerSinSync.sync(player);
         return true;
     }
+
+    /** 强制扣减组合，允许透支为负（侵蚀释放；负值在 EGO 状态结束时归 0）。 */
+    public static void consumeAllForced(Player player, SinCost[] costs) {
+        SinResources resources = of(player);
+        if (resources == null) {
+            return;
+        }
+        for (SinCost cost : costs) {
+            resources.forceAdd(cost.sin(), -cost.amount());
+        }
+        PlayerSinSync.sync(player);
+    }
+
+    /** 负数归 0（EGO 状态结束时由 EgoStateApi 调用）。 */
+    public static void normalizeNegative(Player player) {
+        SinResources resources = of(player);
+        if (resources == null) {
+            return;
+        }
+        boolean changed = false;
+        for (SinType type : SinType.values()) {
+            if (resources.get(type) < 0) {
+                resources.set(type, 0);
+                changed = true;
+            }
+        }
+        if (changed) {
+            PlayerSinSync.sync(player);
+        }
+    }
 }

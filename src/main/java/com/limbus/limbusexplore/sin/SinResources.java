@@ -24,6 +24,11 @@ public final class SinResources {
         values.put(type, Math.max(0, get(type) + amount));
     }
 
+    /** 不设下限的扣减，侵蚀消耗用（透支为负，等状态结束归 0）。 */
+    public void forceAdd(SinType type, int amount) {
+        values.put(type, get(type) + amount);
+    }
+
     public void set(SinType type, int amount) {
         values.put(type, Math.max(0, amount));
     }

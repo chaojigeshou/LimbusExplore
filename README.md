@@ -68,16 +68,54 @@ ClientEgoLoadout.unequip(slot);
 
 ```java
 EgoApi.ReleaseResult result = EgoApi.release(serverPlayer, ego);
-// RELEASED        已扣减（SinApi.consumeAll(costs) + SanityApi.consume(sanityCost)）
-// SIN_LACK        罪孽资源不够
-// SANITY_LACK     理智不够（扣完低于 -45）
-EgoApi.check(serverPlayer, ego);   // 只判断不扣
+// RELEASED        普通释放，已扣减，进入 30s EGO 状态
+// CORRODED        侵蚀释放，消耗 ×1.5 向上取整 + 透支扣负，进入 30s EGO 状态
+// SIN_LACK        罪孽资源不够（普通释放）
+// SANITY_LACK     理智不够（普通释放，扣完低于 -45）
+// IN_EGO_STATE    已在 EGO 状态中，禁止释放
+EgoApi.check(serverPlayer, ego);          // 只判断不扣（普通释放的预检）
+EgoApi.releaseCorrosion(serverPlayer, ego); // 侵蚀释放：SinApi.consumeAllForced + SanityApi.consumeForce
 ```
 
 界面操作：
 
 - 装备界面（G 键）：上排 5 槽，左键选槽、右键卸下；下排 EGO 列表，左键装备（等级不匹配的条目灰显），ESC 关闭
-- 释放界面（R 键）：只显示已装备的 EGO，按槽位顺序从左到右（空槽跳过）；左键释放，R 或 ESC 关闭；卡片含名称、图片、等级、介绍、资源组合、理智消耗，不满足的项标红
+- 释放界面（R 键）：只显示已装备的 EGO，按槽位顺序从左到右（空槽跳过）；**短按（<500ms）按当前形态释放，长按（>=500ms）切换侵蚀态**（卡片变红、消耗按 1.5 倍展示、角标"侵蚀"），**右键取消侵蚀态**；R 或 ESC 关闭
+- 侵蚀态消耗：罪孽组合 ×1.5 向上取整、允许透支为负；理智 ×1.5 向上取整、不查下限直接扣（收缩到 -45）；两者都不够也不拦（透支），状态结束负值归 0
+
+## EGO 状态（30s）
+
+释放成功后进入 EGO 状态：30 秒、期间禁止再次释放、HUD 左侧显示倒计时与当前 EGO（金色=普通，红色=侵蚀）、结束时负值罪孽资源归 0。
+
+| 类 | 说明 |
+|----|------|
+| `ego/EgoState` | 状态数据：结束时间（绝对毫秒）、当前 EGO、形态；NBT 存取（过期自动作废） |
+| `ego/EgoStateCapabilities` + `EgoStateProvider` | capability 挂载（键 `limbusexplore:ego_state`） |
+| `ego/EgoStateListener` | 三段钩子（默认空实现，战斗/表现效果挂这里） |
+| `ego/EgoStateApi` | 服务端状态机（enter/end/tick/isInState/remainingSeconds/registerListener/sync） |
+| `client/ClientEgoState` | 客户端镜像（剩余秒数/当前 EGO/形态） |
+| `net/EgoStateSyncPacket` + `PlayerEgoStateSync` | 每秒同步剩余时间；登录/换维/重生全量同步 |
+
+`EgoStateListener` 三个接口：
+
+```java
+EgoStateApi.registerListener(new EgoStateListener() {
+    @Override public void beforeEnter(ServerPlayer player, Ego ego, boolean corroded) {}
+    @Override public void whileInState(ServerPlayer player, Ego ego, boolean corroded, int remainingSeconds) {}
+    @Override public void onEnd(ServerPlayer player, Ego ego, boolean corroded) {}
+});
+```
+
+`EgoStateApi`：
+
+```java
+boolean EgoStateApi.isInState(player);
+int    EgoStateApi.remainingSeconds(player);
+void   EgoStateApi.enter(ServerPlayer, Ego, boolean corroded);   // 释放成功后由 EgoApi 调用
+void   EgoStateApi.end(ServerPlayer);                             // 状态结束（负值归 0 + onEnd）
+void   EgoStateApi.registerListener(EgoStateListener);            // 挂三段钩子
+void   EgoStateApi.sync(Player);                                  // 全量同步（PlayerEgoStateSync 自动调）
+```
 
 ## 理智值
 

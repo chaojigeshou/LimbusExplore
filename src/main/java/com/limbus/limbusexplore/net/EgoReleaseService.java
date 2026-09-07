@@ -11,12 +11,14 @@ public final class EgoReleaseService {
     private EgoReleaseService() {
     }
 
-    public static void handle(ServerPlayer player, String egoId) {
+    public static void handle(ServerPlayer player, String egoId, boolean corroded) {
         Ego ego = Ego.byId(egoId);
         if (ego == null) {
             return;
         }
-        EgoApi.ReleaseResult result = EgoApi.release(player, ego);
+        EgoApi.ReleaseResult result = corroded
+                ? EgoApi.releaseCorrosion(player, ego)
+                : EgoApi.release(player, ego);
         ModNetworking.sendToPlayer(player, new EgoReleaseResultPacket(ego.id, result.ordinal()));
     }
 }

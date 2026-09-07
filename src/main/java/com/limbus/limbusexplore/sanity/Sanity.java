@@ -39,6 +39,11 @@ public final class Sanity {
         return true;
     }
 
+    /** 不查下限直接扣，扣完收缩到 MIN（侵蚀释放用）。 */
+    public void consumeForce(int amount) {
+        value = Math.max(MIN, value - amount);
+    }
+
     public void copyFrom(Sanity other) {
         this.value = other.value;
     }

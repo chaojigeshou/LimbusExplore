@@ -60,6 +60,16 @@ public final class SanityApi {
         return true;
     }
 
+    /** 不查下限直接扣（侵蚀释放），扣完收缩到 -45。 */
+    public static void consumeForce(Player player, int amount) {
+        Sanity sanity = of(player);
+        if (sanity == null) {
+            return;
+        }
+        sanity.consumeForce(amount);
+        PlayerSanitySync.sync(player);
+    }
+
     // 到 -45 就算崩溃，战斗系统判断侵蚀触发用它
     public static boolean isInChaos(Player player) {
         return get(player) <= Sanity.MIN;
