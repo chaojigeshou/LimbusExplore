@@ -28,17 +28,7 @@ public class EgoReleaseScreen extends Screen {
     }
 
     private static Ego[] visibleEgos() {
-        Ego[] visible = new Ego[ClientEgoLoadout.SLOTS];
-        int count = 0;
-        for (int slot = 0; slot < ClientEgoLoadout.SLOTS; slot++) {
-            Ego ego = ClientEgoLoadout.get(slot);
-            if (ego != null) {
-                visible[count++] = ego;
-            }
-        }
-        Ego[] result = new Ego[count];
-        System.arraycopy(visible, 0, result, 0, count);
-        return result;
+        return ClientEgoLoadout.equippedList();
     }
 
     private static int cardY(int screenHeight) {
@@ -50,13 +40,15 @@ public class EgoReleaseScreen extends Screen {
         return screenWidth / 2 - total / 2 + index * (ITEM_W + ITEM_GAP);
     }
 
-    // 正式图没放之前回退罪孽图标，所以每次都查一下资源有没有
+    // 正式图没放之前回退罪孽图标。结果缓存起来：渲染每帧都画，别再每帧查资源包
+    // （注意：F3+T 热重载资源包后新图要重进游戏才生效）
+    private static final java.util.Map<String, ResourceLocation> TEXTURES = new java.util.HashMap<>();
+
     private static ResourceLocation textureOf(Minecraft minecraft, Ego ego) {
-        ResourceLocation texture = ego.texture();
-        if (minecraft.getResourceManager().getResource(texture).isEmpty()) {
-            return ego.sin.texture();
-        }
-        return texture;
+        return TEXTURES.computeIfAbsent(ego.id, id -> {
+            ResourceLocation texture = ego.texture();
+            return minecraft.getResourceManager().getResource(texture).isEmpty() ? ego.sin.texture() : texture;
+        });
     }
 
     // 预检：缺哪个资源提示哪个（服务端还会判一次，这里只是省去往返）

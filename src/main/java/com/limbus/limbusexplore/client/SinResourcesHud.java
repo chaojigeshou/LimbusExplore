@@ -38,7 +38,7 @@ public final class SinResourcesHud {
         // 理智值单独一行，正绿负红
         int sanity = ClientSanity.get();
         graphics.drawString(minecraft.font,
-                Component.translatable("sanity.limbusexplore.hud", String.format("%+d", sanity)),
+                Component.translatable("sanity.limbusexplore.hud", (sanity >= 0 ? "+" : "") + sanity),
                 LEFT + 1, y - 14, sanity < 0 ? 0xFFE04B4B : 0xFF7FBF7F, true);
 
         for (SinType sin : sins) {

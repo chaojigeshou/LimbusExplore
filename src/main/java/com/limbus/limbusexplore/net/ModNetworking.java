@@ -11,7 +11,8 @@ import net.minecraftforge.network.simple.SimpleChannel;
 import java.util.Optional;
 
 // 全 mod 只有一个频道。加新包的时候在 register() 里加一行注册，然后用 sendToXxx 发。
-// 注意给每个包标对方向，S2C 和 C2S 弄混了客户端收不到也不会报错，只有日志里一声警告。
+// 注意：给每个包标对方向（S2C/C2S 反了客户端收不到，也只有日志一声警告）；
+// 协议有破坏性变更（改包号/双向/互相不兼容）时把 PROTOCOL 的 "1" 改成 "2"，否则两边对不上不报错。
 public final class ModNetworking {
 
     private static final String PROTOCOL = "1";

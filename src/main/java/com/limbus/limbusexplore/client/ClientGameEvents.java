@@ -28,7 +28,7 @@ public final class ClientGameEvents {
             return;
         }
 
-        if (ClientModEvents.TOGGLE_SIN_HUD.consumeClick()) {
+        if (ClientModEvents.TOGGLE_SIN_HUD.consumeClick() && minecraft.screen == null) {
             SinResourcesHud.toggleVisible();
         }
         if (ClientModEvents.OPEN_EGO_LOADOUT.consumeClick() && minecraft.screen == null) {

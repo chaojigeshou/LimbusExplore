@@ -11,6 +11,10 @@ public final class ClientEgoLoadout {
 
     private static final Ego[] EQUIPPED = new Ego[SLOTS];
 
+    // 已装备列表的缓存，渲染每帧都用它；装备一变就置脏重算
+    private static Ego[] cachedList = new Ego[0];
+    private static boolean dirty = true;
+
     private ClientEgoLoadout() {
     }
 
@@ -38,10 +42,34 @@ public final class ClientEgoLoadout {
             }
         }
         EQUIPPED[slot] = ego;
+        dirty = true;
         return true;
     }
 
     public static void unequip(int slot) {
         EQUIPPED[slot] = null;
+        dirty = true;
+    }
+
+    /** 只含非空槽、按槽位顺序（Z 最左）的已装备列表。渲染频繁调用，内部有缓存。 */
+    public static Ego[] equippedList() {
+        if (dirty) {
+            int count = 0;
+            for (Ego ego : EQUIPPED) {
+                if (ego != null) {
+                    count++;
+                }
+            }
+            Ego[] list = new Ego[count];
+            int i = 0;
+            for (Ego ego : EQUIPPED) {
+                if (ego != null) {
+                    list[i++] = ego;
+                }
+            }
+            cachedList = list;
+            dirty = false;
+        }
+        return cachedList;
     }
 }

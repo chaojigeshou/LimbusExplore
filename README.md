@@ -57,6 +57,7 @@ boolean consumeAll(Player, SinCost[]);  // 全够才一起扣
 
 ```java
 ClientEgoLoadout.get(slot);                    // Ego 或 null
+ClientEgoLoadout.equippedList();               // 非空槽的已装备列表（按槽位顺序，内部缓存）
 ClientEgoLoadout.levelOfSlot(slot);            // 槽位固定等级
 ClientEgoLoadout.canEquip(slot, ego);
 ClientEgoLoadout.equip(slot, ego);             // 等级不匹配返回 false；已在别的槽会自动腾出
