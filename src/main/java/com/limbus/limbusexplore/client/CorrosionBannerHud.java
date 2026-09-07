@@ -8,8 +8,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 
 /**
- * 侵蚀横幅：屏幕顶部中央。
- * 释放侵蚀 EGO 瞬间：corrosion_flash（一闪，淡入淡出）；
+ * 侵蚀横幅：全屏覆盖。
+ * 释放侵蚀 EGO 瞬间：corrosion_flash（一闪，淡入淡出后消失）；
  * EGO 状态期间（侵蚀形态）：corrosion 持续显示，和状态 30s 同步消失。
  */
 public final class CorrosionBannerHud {
@@ -18,10 +18,6 @@ public final class CorrosionBannerHud {
             new ResourceLocation(LimbusExplore.MODID, "textures/hud/corrosion_flash.png");
     private static final ResourceLocation BAR =
             new ResourceLocation(LimbusExplore.MODID, "textures/hud/corrosion.png");
-
-    private static final int WIDTH = 224;
-    private static final int HEIGHT = 14;
-    private static final int Y = 28;
 
     /** 闪光时长和淡入淡出区间（毫秒）。 */
     private static final long FLASH_TOTAL = 800;
@@ -38,17 +34,21 @@ public final class CorrosionBannerHud {
         flashStart = System.currentTimeMillis();
     }
 
+    // 全屏拉伸贴图，前面垫一层半透明黑，避免太刺眼
+    private static void blitFull(GuiGraphics graphics, ResourceLocation texture, int screenWidth, int screenHeight) {
+        graphics.fill(0, 0, screenWidth, screenHeight, 0x40000000);
+        graphics.blit(texture, 0, 0, 0, 0, screenWidth, screenHeight, screenWidth, screenHeight);
+    }
+
     public static void render(ForgeGui gui, GuiGraphics graphics, float partialTick, int screenWidth, int screenHeight) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null || minecraft.options.hideGui) {
             return;
         }
 
-        int x = (screenWidth - WIDTH) / 2;
-
-        // 持续横幅：侵蚀形态的 EGO 状态期间显示
+        // 持续横幅：侵蚀形态的 EGO 状态期间全屏显示
         if (ClientEgoState.isInState() && ClientEgoState.isCorroded()) {
-            graphics.blit(BAR, x, Y, 0, 0, WIDTH, HEIGHT, WIDTH, HEIGHT);
+            blitFull(graphics, BAR, screenWidth, screenHeight);
         }
 
         // 瞬间闪光：淡入 → 保持 → 淡出
@@ -64,7 +64,7 @@ public final class CorrosionBannerHud {
                     alpha = 1f;
                 }
                 RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
-                graphics.blit(FLASH, x, Y, 0, 0, WIDTH, HEIGHT, WIDTH, HEIGHT);
+                blitFull(graphics, FLASH, screenWidth, screenHeight);
                 RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
             } else {
                 flashStart = -1;
