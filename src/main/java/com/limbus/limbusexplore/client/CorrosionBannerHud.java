@@ -2,29 +2,45 @@ package com.limbus.limbusexplore.client;
 
 import com.limbus.limbusexplore.LimbusExplore;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
+import org.slf4j.Logger;
+
+import java.io.IOException;
 
 /**
- * 侵蚀横幅：全屏覆盖。
- * 释放侵蚀 EGO 瞬间：corrosion_flash（一闪，淡入淡出后消失）；
- * EGO 状态期间（侵蚀形态）：corrosion 持续显示，和状态 30s 同步消失。
+ * 侵蚀全屏渲染：Voronoi(Worley) 侵蚀着色器。
+ * 一瞬间（release 后 1.4s）：Mode=1，龟裂爆闪 + 中心脉冲，淡入淡出；
+ * 持续（EGO 状态 30s）：Mode=0，细胞流动 + 边界呼吸闪烁。
+ * shader 加载失败时回退到贴图 blit 全屏。
  */
 public final class CorrosionBannerHud {
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final ResourceLocation FLASH =
             new ResourceLocation(LimbusExplore.MODID, "textures/hud/corrosion_flash.png");
     private static final ResourceLocation BAR =
             new ResourceLocation(LimbusExplore.MODID, "textures/hud/corrosion.png");
+    public static final ResourceLocation SHADER_ID =
+            new ResourceLocation(LimbusExplore.MODID, "corrosion_erosion");
 
-    /** 闪光时长和淡入淡出区间（毫秒）：淡入要慢，渐显过渡。 */
     private static final long FLASH_TOTAL = 1400;
     private static final long FADE_IN = 700;
     private static final long FADE_OUT = 700;
 
     private static long flashStart = -1;
+    private static ShaderInstance shader;
+    private static boolean shaderFailed;
 
     private CorrosionBannerHud() {
     }
@@ -34,7 +50,20 @@ public final class CorrosionBannerHud {
         flashStart = System.currentTimeMillis();
     }
 
-    // 全屏拉伸贴图，前面垫一层半透明黑，避免太刺眼
+    private static ShaderInstance shader() {
+        if (shader == null && !shaderFailed) {
+            try {
+                shader = new ShaderInstance(Minecraft.getInstance().getResourceManager(),
+                        SHADER_ID, DefaultVertexFormat.POSITION);
+            } catch (IOException e) {
+                shaderFailed = true;
+                LOGGER.error("Failed to load corrosion shader, falling back to texture blit", e);
+            }
+        }
+        return shader;
+    }
+
+    // 贴图全屏（shader 不可用时的回退）
     private static void blitFull(GuiGraphics graphics, ResourceLocation texture, int screenWidth, int screenHeight) {
         graphics.fill(0, 0, screenWidth, screenHeight, 0x40000000);
         graphics.blit(texture, 0, 0, 0, 0, screenWidth, screenHeight, screenWidth, screenHeight);
@@ -46,30 +75,69 @@ public final class CorrosionBannerHud {
             return;
         }
 
-        // 持续横幅：侵蚀形态的 EGO 状态期间全屏显示
-        if (ClientEgoState.isInState() && ClientEgoState.isCorroded()) {
-            blitFull(graphics, BAR, screenWidth, screenHeight);
-        }
+        boolean flashActive = flashStart >= 0 && System.currentTimeMillis() - flashStart < FLASH_TOTAL;
+        boolean barActive = ClientEgoState.isInState() && ClientEgoState.isCorroded();
 
-        // 瞬间闪光：淡入 → 淡出。只依赖 flashStart 自己计时，
-        // 不依赖状态包先到（两个 S2C 包同通道保序通常没问题，但别赌顺序）
-        if (flashStart >= 0) {
-            long t = System.currentTimeMillis() - flashStart;
-            if (t < FLASH_TOTAL) {
-                float alpha;
-                if (t < FADE_IN) {
-                    alpha = t / (float) FADE_IN;
-                } else if (t > FLASH_TOTAL - FADE_OUT) {
-                    alpha = (FLASH_TOTAL - t) / (float) FADE_OUT;
-                } else {
-                    alpha = 1f;
-                }
-                RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
-                blitFull(graphics, FLASH, screenWidth, screenHeight);
-                RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-            } else {
+        if (!flashActive && !barActive) {
+            if (flashStart >= 0) {
                 flashStart = -1;
             }
+            return;
         }
+
+        // 计算 uniforms
+        float mode = flashActive ? 1f : 0f;
+        float time;
+        float intensity = 1f;
+        if (flashActive) {
+            float t = System.currentTimeMillis() - flashStart;
+            if (t < FADE_IN) {
+                intensity = t / (float) FADE_IN;
+            } else if (t > FLASH_TOTAL - FADE_OUT) {
+                intensity = (FLASH_TOTAL - t) / (float) FADE_OUT;
+            } else {
+                intensity = 1f;
+            }
+            time = t / 1000f;
+        } else {
+            time = 30f - ClientEgoState.remainingSeconds();
+        }
+
+        int flashTex = minecraft.getTextureManager().getTexture(FLASH).getId();
+        int barTex = minecraft.getTextureManager().getTexture(BAR).getId();
+
+        ShaderInstance s = shader();
+        if (s == null) {
+            // 回退：老的全屏贴图
+            if (flashActive) {
+                RenderSystem.setShaderColor(1f, 1f, 1f, intensity);
+                blitFull(graphics, FLASH, screenWidth, screenHeight);
+                RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+            }
+            if (barActive) {
+                blitFull(graphics, BAR, screenWidth, screenHeight);
+            }
+            return;
+        }
+
+        // 上传 uniforms + sampler 单元，apply 应用 blend 并上传
+        s.getUniform("Time").set(time);
+        s.getUniform("Intensity").set(intensity);
+        s.getUniform("Mode").set(mode);
+        s.setSampler("SamplerFlash", 0);
+        s.setSampler("SamplerBar", 1);
+        RenderSystem.setShader(() -> s);
+        s.apply();
+        RenderSystem.setShaderTexture(0, FLASH);
+        RenderSystem.setShaderTexture(1, BAR);
+
+        // 全屏 quad（顶点 -1..1，vsh 负责转 UV 和裁剪坐标）
+        BufferBuilder buffer = Tesselator.getInstance().getBuilder();
+        buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION);
+        buffer.vertex(-1.0, -1.0, 0.0).endVertex();
+        buffer.vertex(1.0, -1.0, 0.0).endVertex();
+        buffer.vertex(1.0, 1.0, 0.0).endVertex();
+        buffer.vertex(-1.0, 1.0, 0.0).endVertex();
+        BufferUploader.drawWithShader(buffer.end());
     }
 }
