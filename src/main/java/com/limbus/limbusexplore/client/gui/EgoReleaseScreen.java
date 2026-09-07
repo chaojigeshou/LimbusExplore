@@ -121,7 +121,10 @@ public class EgoReleaseScreen extends Screen {
         }
 
         int y0 = cardY(height);
-        boolean pressing = pressSlot >= 0 && System.currentTimeMillis() - pressStart < LONG_PRESS_MS;
+        // 长按反馈只在「普通 → 侵蚀」的切换过程里出现；已经侵蚀态的槽位不再显示
+        boolean pressing = pressSlot >= 0
+                && System.currentTimeMillis() - pressStart < LONG_PRESS_MS
+                && !ClientEgoLoadout.isCorroded(pressSlot);
         int visibleIndex = 0;
         for (int slot = 0; slot < ClientEgoLoadout.SLOTS; slot++) {
             Ego ego = ClientEgoLoadout.get(slot);
@@ -232,8 +235,10 @@ public class EgoReleaseScreen extends Screen {
 
         long duration = System.currentTimeMillis() - pressStart;
         if (duration >= LONG_PRESS_MS) {
-            // 长按：切成侵蚀态
-            ClientEgoLoadout.setCorroded(slot, true);
+            // 长按：切成侵蚀态（已侵蚀则保持，不重复）
+            if (!ClientEgoLoadout.isCorroded(slot)) {
+                ClientEgoLoadout.setCorroded(slot, true);
+            }
             return true;
         }
 
