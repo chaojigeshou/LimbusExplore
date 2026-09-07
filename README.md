@@ -150,14 +150,41 @@ boolean SanityApi.isInChaos(Player);      // get() <= Sanity.MIN
 /sanity get | add <n> | set <n> | reset                    （权限 2）
 ```
 
-## 生命周期
+## 架构设计
 
-| 总线 | 事件 | 类 |
-|------|------|----|
-| MOD | `RegisterGuiOverlaysEvent`、`RegisterKeyMappingsEvent` | `client/ClientModEvents` |
-| FORGE | tick、玩家事件、命令、capability | `ModCapabilities`、`SanityCapabilities`、`PlayerSinSync`、`PlayerSanitySync`、`ClientGameEvents`、`ModCommands`、`SanityCommands` |
+### 分层
 
-两条总线的事件不要混在同一个监听类里，混了会导致整个类的自动订阅失败。
+```
+data   sin/Sanity/ego 容器+枚举     纯状态，只有 NBT 存取，不 import net/、client/
+api    SinApi/SanityApi/EgoApi/EgoStateApi   业务唯一入口，改完自带同步
+cap    *Capabilities + *Provider    capability 定义与玩家挂载（FORGE 总线）
+net    ModNetworking/包/PlayerDataSync/EgoReleaseService   频道、同步、服务端处理
+client 缓存/界面对话/注册/运行期   只读镜像 + 预检，判定永远在服务端
+command /sins /sanity              调试命令（权限 2）
+```
+
+依赖方向单向：`data ← api ← (command|net 服务端处理)`；`client` 依赖 `ego`/`net` 的包定义，但**服务端逻辑不依赖 client**。
+
+### 约定
+
+1. **服务端权威**：判定与扣减全在服务端；客户端只有 `Client*` 镜像和预检（`canPay` 类），预检失败直接提示、不发包
+2. **数据修改必须走 Api**：业务代码不得直接摸 capability、网络包、容器字段；Api 内部保证改完同步
+3. **注册集中一处**：网络包全部在 `ModNetworking.register()`；客户端注册全部在 `ClientModEvents`（MOD 总线）；运行期逻辑全部在 `ClientGameEvents`（FORGE 总线）；玩家数据同步监听全部在 `net/PlayerDataSync`
+4. **总线**：MOD = 注册，FORGE = 运行期；一个监听类只挂一条总线（混了整类注册失败）
+5. **命名**：id/资源文件名一律小写 snake_case；类名 = 模块 + 职责（`SinApi`、`EgoStateProvider`）
+6. **同步包顺序**：`SinType.values()` 就是 `int[7]` 的顺序，别重排；协议破坏性变更 bump `ModNetworking.PROTOCOL`
+
+### 新模块模板（照 sin 抄）
+
+```
+容器(EnumMap/NBT) → Provider(ICapabilitySerializable) → Capabilities(attach+clone)
+→ Api(修改后 PlayerDataSync.syncXxx) → SyncPacket(注册进 ModNetworking) → 客户端镜像 Client*
+```
+
+### 已知待办（架构层面的）
+
+- 装备数据还在客户端（`ClientEgoLoadout`）：联机前搬到服务端 capability，`EgoReleaseService` 补「确实装在槽位上」的校验（否则客户端可伪造 egoId 释放）
+- 侵蚀相关（理智 -45 崩溃、超频）在战斗系统落地时接 `EgoApi`/`SanityApi.isInChaos`
 
 ## 项目结构
 

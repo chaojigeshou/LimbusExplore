@@ -1,7 +1,7 @@
 package com.limbus.limbusexplore.sin;
 
 import com.limbus.limbusexplore.ego.SinCost;
-import com.limbus.limbusexplore.net.PlayerSinSync;
+import com.limbus.limbusexplore.net.PlayerDataSync;
 import net.minecraft.world.entity.player.Player;
 
 // 业务层都从这里拿/改资源，别去摸 capability 和网络包。
@@ -26,7 +26,7 @@ public final class SinApi {
             return;
         }
         resources.add(type, amount);
-        PlayerSinSync.sync(player);
+        PlayerDataSync.syncSin(player);
     }
 
     public static void set(Player player, SinType type, int amount) {
@@ -35,7 +35,7 @@ public final class SinApi {
             return;
         }
         resources.set(type, amount);
-        PlayerSinSync.sync(player);
+        PlayerDataSync.syncSin(player);
     }
 
     public static void clear(Player player) {
@@ -44,7 +44,7 @@ public final class SinApi {
             return;
         }
         resources.clear();
-        PlayerSinSync.sync(player);
+        PlayerDataSync.syncSin(player);
     }
 
     // 够扣才扣，不够返回 false
@@ -54,7 +54,7 @@ public final class SinApi {
             return false;
         }
         resources.add(type, -amount);
-        PlayerSinSync.sync(player);
+        PlayerDataSync.syncSin(player);
         return true;
     }
 
@@ -83,7 +83,7 @@ public final class SinApi {
         for (SinCost cost : costs) {
             resources.add(cost.sin(), -cost.amount());
         }
-        PlayerSinSync.sync(player);
+        PlayerDataSync.syncSin(player);
         return true;
     }
 
@@ -96,7 +96,7 @@ public final class SinApi {
         for (SinCost cost : costs) {
             resources.forceAdd(cost.sin(), -cost.amount());
         }
-        PlayerSinSync.sync(player);
+        PlayerDataSync.syncSin(player);
     }
 
     /** 负数归 0（EGO 状态结束时由 EgoStateApi 调用）。 */
@@ -113,7 +113,7 @@ public final class SinApi {
             }
         }
         if (changed) {
-            PlayerSinSync.sync(player);
+            PlayerDataSync.syncSin(player);
         }
     }
 }

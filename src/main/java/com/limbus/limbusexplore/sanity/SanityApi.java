@@ -1,6 +1,6 @@
 package com.limbus.limbusexplore.sanity;
 
-import com.limbus.limbusexplore.net.PlayerSanitySync;
+import com.limbus.limbusexplore.net.PlayerDataSync;
 import net.minecraft.world.entity.player.Player;
 
 // 理智值的业务入口，和 SinApi 一个套路：改完自动同步，别碰 capability 和网络层。
@@ -25,7 +25,7 @@ public final class SanityApi {
             return;
         }
         sanity.add(amount);
-        PlayerSanitySync.sync(player);
+        PlayerDataSync.syncSanity(player);
     }
 
     public static void set(Player player, int value) {
@@ -34,7 +34,7 @@ public final class SanityApi {
             return;
         }
         sanity.set(value);
-        PlayerSanitySync.sync(player);
+        PlayerDataSync.syncSanity(player);
     }
 
     public static void reset(Player player) {
@@ -43,7 +43,7 @@ public final class SanityApi {
             return;
         }
         sanity.reset();
-        PlayerSanitySync.sync(player);
+        PlayerDataSync.syncSanity(player);
     }
 
     public static boolean canPay(Player player, int amount) {
@@ -56,7 +56,7 @@ public final class SanityApi {
         if (sanity == null || !sanity.consume(amount)) {
             return false;
         }
-        PlayerSanitySync.sync(player);
+        PlayerDataSync.syncSanity(player);
         return true;
     }
 
@@ -67,7 +67,7 @@ public final class SanityApi {
             return;
         }
         sanity.consumeForce(amount);
-        PlayerSanitySync.sync(player);
+        PlayerDataSync.syncSanity(player);
     }
 
     // 到 -45 就算崩溃，战斗系统判断侵蚀触发用它
