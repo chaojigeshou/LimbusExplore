@@ -22,9 +22,9 @@ import org.lwjgl.glfw.GLFW;
 // 注意：卡片序号是「可见顺序」，槽位号是 0..4，两者别搞混（setCorroded 要槽位号）。
 public class EgoReleaseScreen extends Screen {
 
-    private static final int ITEM_W = 120;
-    private static final int ITEM_H = 150;
-    private static final int ITEM_GAP = 10;
+    private static final int ITEM_W = 150;
+    private static final int ITEM_H = 172;
+    private static final int ITEM_GAP = 12;
     private static final long LONG_PRESS_MS = 500;
 
     private int pressSlot = -1;
@@ -154,49 +154,49 @@ public class EgoReleaseScreen extends Screen {
             int textColor = corroded ? 0xFFFF9E9E : (fits ? 0xFFFFFF : 0xFF909090);
 
             // 图片（居中）+ 名称 + 等级
-            gui.blit(textureOf(minecraft, ego), x + (ITEM_W - 40) / 2, y + 8, 0, 0, 40, 40, 40, 40);
+            gui.blit(textureOf(minecraft, ego), x + (ITEM_W - 48) / 2, y + 10, 0, 0, 48, 48, 48, 48);
             gui.drawCenteredString(font, minecraft.font.plainSubstrByWidth(
-                    Component.translatable(ego.displayKey()).getString(), ITEM_W - 12), x + ITEM_W / 2, y + 52, textColor);
+                    Component.translatable(ego.displayKey()).getString(), ITEM_W - 12), x + ITEM_W / 2, y + 62, textColor);
             gui.drawCenteredString(font, Component.translatable(ego.level.displayKey()),
-                    x + ITEM_W / 2, y + 64, ego.level.color);
+                    x + ITEM_W / 2, y + 76, ego.level.color);
 
             // 介绍（两行截断）
             String desc = Component.translatable(ego.descKey()).getString();
             String line1 = minecraft.font.plainSubstrByWidth(desc, ITEM_W - 12);
             String line2 = desc.length() > line1.length()
                     ? minecraft.font.plainSubstrByWidth(desc.substring(line1.length()), ITEM_W - 12) : "";
-            gui.drawString(font, line1, x + (ITEM_W - font.width(line1)) / 2, y + 78, 0xFFBBBBBB, false);
+            gui.drawString(font, line1, x + (ITEM_W - font.width(line1)) / 2, y + 92, 0xFFBBBBBB, false);
             if (!line2.isEmpty()) {
-                gui.drawString(font, line2, x + (ITEM_W - font.width(line2)) / 2, y + 88, 0xFFBBBBBB, false);
+                gui.drawString(font, line2, x + (ITEM_W - font.width(line2)) / 2, y + 104, 0xFFBBBBBB, false);
             }
 
             // 所需资源（组合，每个一行）；侵蚀态按 1.5 倍向上取整显示
-            int costY = y + 104;
+            int costY = y + 122;
             for (SinCost cost : ego.costs) {
                 int amount = corroded ? (cost.amount() * 3 + 1) / 2 : cost.amount();
-                gui.blit(cost.sin().texture(), x + 14, costY, 0, 0, 14, 14, 16, 16);
+                gui.blit(cost.sin().texture(), x + 18, costY, 0, 0, 14, 14, 16, 16);
                 String label = Component.translatable(cost.sin().displayKey()).getString() + " ×" + amount;
                 boolean enough = !corroded && minecraft.player != null
                         && ClientSinResources.get(cost.sin()) >= cost.amount();
-                gui.drawString(font, label, x + 31, costY + 1, enough ? 0xFFD8D8D8 : 0xFFE04B4B, false);
-                costY += 13;
+                gui.drawString(font, label, x + 35, costY + 1, enough ? 0xFFD8D8D8 : 0xFFE04B4B, false);
+                costY += 15;
             }
 
             // 理智消耗（侵蚀态 1.5 倍 + 允许扣穿），不够红
             int sanityCost = corroded ? (ego.sanityCost * 3 + 1) / 2 : ego.sanityCost;
-            gui.drawCenteredString(font, "理智 -" + sanityCost, x + ITEM_W / 2, costY + 1,
+            gui.drawCenteredString(font, "理智 -" + sanityCost, x + ITEM_W / 2, costY + 2,
                     (corroded || sanityFits) ? 0xFF9FD8FF : 0xFFE04B4B);
 
             // 侵蚀态角标
             if (corroded) {
-                gui.drawString(font, "侵蚀", x + ITEM_W - 34, y + 4, 0xFFE04B4B, false);
+                gui.drawString(font, "侵蚀", x + ITEM_W - 36, y + 4, 0xFFE04B4B, false);
             }
 
-            // 长按进度条：横贯卡片宽度，从底部往上填
+            // 长按进度：从底部往上铺满整张卡片
             if (slot == pressSlot && pressing) {
                 float progress = (System.currentTimeMillis() - pressStart) / (float) LONG_PRESS_MS;
-                int barH = (int) (progress * (ITEM_H - 10));
-                gui.fill(x + 2, y + ITEM_H - 5 - barH, x + ITEM_W - 2, y + ITEM_H - 5, 0xFFE8C547);
+                int barH = (int) (progress * ITEM_H);
+                gui.fill(x, y + ITEM_H - barH, x + ITEM_W, y + ITEM_H, 0xFFE8C547);
             }
         }
 
@@ -242,12 +242,13 @@ public class EgoReleaseScreen extends Screen {
             return true;
         }
 
-        // 短按：按当前形态释放
+        // 短按：按当前形态释放，发完包自动关界面
         Ego ego = ClientEgoLoadout.get(slot);
         if (ego != null) {
             boolean corroded = ClientEgoLoadout.isCorroded(slot);
             if (checkRelease(Minecraft.getInstance(), ego, corroded)) {
                 ModNetworking.sendToServer(new EgoReleasePacket(ego.id, corroded));
+                onClose();
             }
         }
         return true;

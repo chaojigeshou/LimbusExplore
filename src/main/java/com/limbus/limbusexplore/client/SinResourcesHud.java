@@ -33,6 +33,11 @@ public final class SinResourcesHud {
             return;
         }
 
+        // 侵蚀形态的 EGO 状态期间：隐藏资源栏（H 键的按钮恢复后可用）
+        if (ClientEgoState.isInState() && ClientEgoState.isCorroded()) {
+            return;
+        }
+
         SinType[] sins = SinType.values();
         int y = (screenHeight - ROW_HEIGHT * sins.length) / 2;
 

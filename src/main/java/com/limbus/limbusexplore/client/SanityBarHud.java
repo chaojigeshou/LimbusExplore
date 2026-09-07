@@ -24,6 +24,11 @@ public final class SanityBarHud {
             return;
         }
 
+        // 侵蚀形态的 EGO 状态期间：理智条也隐藏
+        if (ClientEgoState.isInState() && ClientEgoState.isCorroded()) {
+            return;
+        }
+
         int sanity = ClientSanity.get();
         double ratio = (sanity - Sanity.MIN) / (double) (Sanity.MAX - Sanity.MIN);
         int color = sanity < 0 ? 0xFFE04B4B : 0xFF7FBF7F;
