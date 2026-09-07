@@ -31,8 +31,10 @@ public final class CorrosionBannerHud {
             new ResourceLocation(LimbusExplore.MODID, "textures/hud/corrosion_flash.png");
     private static final ResourceLocation BAR =
             new ResourceLocation(LimbusExplore.MODID, "textures/hud/corrosion.png");
-    public static final ResourceLocation SHADER_ID =
-            new ResourceLocation(LimbusExplore.MODID, "corrosion_erosion");
+
+    // ShaderInstance 只认 minecraft:shaders/core/ 命名空间（硬编码），
+    // 所以 shader 文件放在 assets/minecraft/shaders/core/ 下，加载用裸名即可。
+    private static final String SHADER_NAME = "corrosion_erosion";
 
     private static final long FLASH_TOTAL = 1400;
     private static final long FADE_IN = 700;
@@ -54,7 +56,7 @@ public final class CorrosionBannerHud {
         if (shader == null && !shaderFailed) {
             try {
                 shader = new ShaderInstance(Minecraft.getInstance().getResourceManager(),
-                        SHADER_ID, DefaultVertexFormat.POSITION);
+                        SHADER_NAME, DefaultVertexFormat.POSITION);
             } catch (IOException e) {
                 shaderFailed = true;
                 LOGGER.error("Failed to load corrosion shader, falling back to texture blit", e);
