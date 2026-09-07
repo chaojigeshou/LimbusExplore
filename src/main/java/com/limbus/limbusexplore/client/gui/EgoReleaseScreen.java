@@ -125,6 +125,13 @@ public class EgoReleaseScreen extends Screen {
         boolean pressing = pressSlot >= 0
                 && System.currentTimeMillis() - pressStart < LONG_PRESS_MS
                 && !ClientEgoLoadout.isCorroded(pressSlot);
+
+        // 按住满 500ms 的瞬间就切侵蚀态，不用等松开
+        if (pressSlot >= 0 && !ClientEgoLoadout.isCorroded(pressSlot)
+                && System.currentTimeMillis() - pressStart >= LONG_PRESS_MS) {
+            ClientEgoLoadout.setCorroded(pressSlot, true);
+            pressSlot = -1; // 已经切好了，等会儿松开不需要再做任何事
+        }
         int visibleIndex = 0;
         for (int slot = 0; slot < ClientEgoLoadout.SLOTS; slot++) {
             Ego ego = ClientEgoLoadout.get(slot);

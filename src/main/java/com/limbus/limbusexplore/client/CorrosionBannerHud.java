@@ -19,10 +19,10 @@ public final class CorrosionBannerHud {
     private static final ResourceLocation BAR =
             new ResourceLocation(LimbusExplore.MODID, "textures/hud/corrosion.png");
 
-    /** 闪光时长和淡入淡出区间（毫秒）。 */
-    private static final long FLASH_TOTAL = 800;
-    private static final long FADE_IN = 150;
-    private static final long FADE_OUT = 350;
+    /** 闪光时长和淡入淡出区间（毫秒）：淡入要慢，渐显过渡。 */
+    private static final long FLASH_TOTAL = 1400;
+    private static final long FADE_IN = 700;
+    private static final long FADE_OUT = 700;
 
     private static long flashStart = -1;
 
