@@ -192,11 +192,11 @@ public class EgoReleaseScreen extends Screen {
                 gui.drawString(font, "侵蚀", x + ITEM_W - 36, y + 4, 0xFFE04B4B, false);
             }
 
-            // 长按进度：从底部往上铺满整张卡片
+            // 长按进度：从底部往上铺满整张卡片，红色半透明
             if (slot == pressSlot && pressing) {
                 float progress = (System.currentTimeMillis() - pressStart) / (float) LONG_PRESS_MS;
                 int barH = (int) (progress * ITEM_H);
-                gui.fill(x, y + ITEM_H - barH, x + ITEM_W, y + ITEM_H, 0xFFE8C547);
+                gui.fill(x, y + ITEM_H - barH, x + ITEM_W, y + ITEM_H, 0x99E04B4B);
             }
         }
 
