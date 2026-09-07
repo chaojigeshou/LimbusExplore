@@ -12,7 +12,7 @@ public final class SinResourcesHud {
 
     private static final int LEFT = 6;
     private static final int ICON_SIZE = 16;
-    private static final int ROW_HEIGHT = 18;
+    private static final int ROW_HEIGHT = 22; // 图标 16 + 6 间隔
 
     private static boolean visible = true;
 
