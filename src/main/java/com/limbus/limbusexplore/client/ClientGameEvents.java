@@ -4,6 +4,7 @@ import com.limbus.limbusexplore.LimbusExplore;
 import com.limbus.limbusexplore.client.gui.EgoLoadoutScreen;
 import com.limbus.limbusexplore.client.gui.EgoReleaseScreen;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -32,10 +33,20 @@ public final class ClientGameEvents {
             SinResourcesHud.toggleVisible();
         }
         if (ClientModEvents.OPEN_EGO_LOADOUT.consumeClick() && minecraft.screen == null) {
-            minecraft.setScreen(new EgoLoadoutScreen());
+            if (ClientEgoState.isInState()) {
+                minecraft.player.displayClientMessage(
+                        Component.translatable("screen.limbusexplore.locked_by_state"), true);
+            } else {
+                minecraft.setScreen(new EgoLoadoutScreen());
+            }
         }
         if (ClientModEvents.RELEASE_EGO.consumeClick() && minecraft.screen == null) {
-            minecraft.setScreen(new EgoReleaseScreen());
+            if (ClientEgoState.isInState()) {
+                minecraft.player.displayClientMessage(
+                        Component.translatable("screen.limbusexplore.locked_by_state"), true);
+            } else {
+                minecraft.setScreen(new EgoReleaseScreen());
+            }
         }
     }
 }

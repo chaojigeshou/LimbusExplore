@@ -39,25 +39,27 @@ void main() {
     vec2 uv = vUV;
     bool flash = Mode > 0.5;
 
-    // 基础图：拉伸全屏（一瞬间图 / 持续图由 Java 端选）
-    vec3 base = texture(flash ? SamplerFlash : SamplerBar, uv).rgb;
-
-    // Worley 12x12 细胞，UV 按细胞 id 偏移后再采样 → 图案被细胞扭曲成龟裂纹理
-    vec2 w = worley(uv * 12.0);
+    // 漂移的细胞：坐标随时间移动，整个网格慢速流动
+    vec2 wp = uv * 12.0 + vec2(Time * 0.4, Time * 0.2);
+    vec2 w = worley(wp);
     float cellEdge = w.y - w.x;
-    float cellId = hash13(floor(uv * 12.0));
+    float cellId = hash13(floor(wp));
+
+    // 基础图：拉伸全屏
+    vec3 base = texture(flash ? SamplerFlash : SamplerBar, uv).rgb;
+    // 按细胞扭曲再采样 → 图案跟着细胞一起碎动
     vec3 warped = texture(flash ? SamplerFlash : SamplerBar,
                           uv + (vec2(0.06, -0.04)) * (cellId - 0.5)).rgb;
 
-    // 侵蚀从屏幕边缘向中心推进（时间驱动）
+    // 侵蚀从屏幕边缘向中心推进，2.5s 内铺满全屏
     float distC = length(uv - vec2(0.5));
-    float invade = 1.0 - smoothstep(0.0, 0.8, distC * (1.0 + Time * 0.9));
+    float invade = 1.0 - smoothstep(0.0, 0.8, distC * (1.0 + clamp(Time, 0.0, 2.5) * 1.3));
 
-    // 一瞬间：边界爆闪（快频）；持续：边界缓慢呼吸闪烁
-    float flicker = 0.5 + 0.5 * sin(Time * (flash ? 22.0 : 1.6) + cellId * 6.28318);
-    float edge = (1.0 - smoothstep(0.0, 0.14, cellEdge)) * (0.35 + 0.65 * flicker);
+    // 一瞬间：边界爆闪；持续：边界缓慢呼吸
+    float flicker = 0.5 + 0.5 * sin(Time * (flash ? 22.0 : 3.0) + cellId * 6.28318);
+    float edge = (1.0 - smoothstep(0.0, 0.22, cellEdge)) * (0.4 + 0.6 * flicker);
 
-    // 一瞬间：中心脉冲环（1.4s 内向外扩散一圈）
+    // 一瞬间：中心脉冲环
     float pulse = 0.0;
     if (flash) {
         float p = clamp(Time / 1.4, 0.0, 1.0);
@@ -65,11 +67,13 @@ void main() {
     }
 
     vec3 violet = vec3(0.55, 0.25, 0.75);
-    vec3 color = mix(base, violet, 0.45 * invade);
+    vec3 color = mix(base, violet, 0.50 * invade);
     color = mix(color, warped, 0.35);
-    color *= 0.75 + 0.25 * cellId;                       // 细胞明暗
-    color += vec3(0.95, 0.5, 1.0) * edge * invade * Intensity * 0.8;  // 边界紫光
-    color += vec3(1.0, 0.8, 1.0) * pulse * Intensity;    // 中心脉冲
+    // 细胞明暗 + 慢慢闪烁（流动感的来源之一）
+    color *= (0.60 + 0.40 * cellId) * (0.70 + 0.30 * sin(Time * 2.5 + cellId * 6.28318));
+    // 边界紫光，加粗加亮
+    color += vec3(0.95, 0.50, 1.0) * edge * invade * Intensity * 1.3;
+    color += vec3(1.0, 0.8, 1.0) * pulse * Intensity;
 
-    fragColor = vec4(color, 0.40 * Intensity);
+    fragColor = vec4(color, 0.45 * Intensity);
 }

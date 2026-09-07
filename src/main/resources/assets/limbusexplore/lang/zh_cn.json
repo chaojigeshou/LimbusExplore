@@ -54,6 +54,7 @@
   "command.limbusexplore.sanity_changed": "理智: %d",
   "screen.limbusexplore.ego_loadout": "E.G.O 装备",
   "screen.limbusexplore.ego_release": "E.G.O 释放",
+  "screen.limbusexplore.locked_by_state": "EGO 状态进行中，无法打开该界面",
   "screen.limbusexplore.ego_empty": "没有已装备的 E.G.O",
   "screen.limbusexplore.ego_release_hint": "左键释放 / 按 R 或 ESC 关闭",
   "screen.limbusexplore.empty_slot": "空",

@@ -54,6 +54,7 @@
   "command.limbusexplore.sanity_changed": "Sanity: %d",
   "screen.limbusexplore.ego_loadout": "E.G.O Loadout",
   "screen.limbusexplore.ego_release": "E.G.O Release",
+  "screen.limbusexplore.locked_by_state": "E.G.O state active, cannot open this screen",
   "screen.limbusexplore.ego_empty": "No E.G.O equipped",
   "screen.limbusexplore.ego_release_hint": "Left click: release / R or ESC: close",
   "screen.limbusexplore.empty_slot": "Empty",
