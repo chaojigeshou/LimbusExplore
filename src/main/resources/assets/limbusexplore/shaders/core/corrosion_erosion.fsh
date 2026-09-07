@@ -39,17 +39,21 @@ void main() {
     vec2 uv = vUV;
     bool flash = Mode > 0.5;
 
-    // 漂移的细胞：坐标随时间移动，整个网格慢速流动
+    // 漂移的细胞：坐标随时间移动，整张网格慢速流动
     vec2 wp = uv * 12.0 + vec2(Time * 0.4, Time * 0.2);
     vec2 w = worley(wp);
     float cellEdge = w.y - w.x;
     float cellId = hash13(floor(wp));
 
-    // 基础图：拉伸全屏
-    vec3 base = texture(flash ? SamplerFlash : SamplerBar, uv).rgb;
-    // 按细胞扭曲再采样 → 图案跟着细胞一起碎动
-    vec3 warped = texture(flash ? SamplerFlash : SamplerBar,
-                          uv + (vec2(0.06, -0.04)) * (cellId - 0.5)).rgb;
+    // 注意：sampler2D 不能走三目运算（GLSL 语法禁止），两张图都采样再选
+    vec2 warpUV = uv + (vec2(0.06, -0.04)) * (cellId - 0.5);
+    vec3 flashImg = texture(SamplerFlash, uv).rgb;
+    vec3 barImg = texture(SamplerBar, uv).rgb;
+    vec3 warpedFlash = texture(SamplerFlash, warpUV).rgb;
+    vec3 warpedBar = texture(SamplerBar, warpUV).rgb;
+
+    vec3 base = flash ? flashImg : barImg;
+    vec3 warped = flash ? warpedFlash : warpedBar;
 
     // 侵蚀从屏幕边缘向中心推进，2.5s 内铺满全屏
     float distC = length(uv - vec2(0.5));
