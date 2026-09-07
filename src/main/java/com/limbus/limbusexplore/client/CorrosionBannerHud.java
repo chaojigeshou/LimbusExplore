@@ -51,10 +51,11 @@ public final class CorrosionBannerHud {
             blitFull(graphics, BAR, screenWidth, screenHeight);
         }
 
-        // 瞬间闪光：淡入 → 保持 → 淡出
+        // 瞬间闪光：淡入 → 淡出。只依赖 flashStart 自己计时，
+        // 不依赖状态包先到（两个 S2C 包同通道保序通常没问题，但别赌顺序）
         if (flashStart >= 0) {
             long t = System.currentTimeMillis() - flashStart;
-            if (t < FLASH_TOTAL && ClientEgoState.isCorroded()) {
+            if (t < FLASH_TOTAL) {
                 float alpha;
                 if (t < FADE_IN) {
                     alpha = t / (float) FADE_IN;
