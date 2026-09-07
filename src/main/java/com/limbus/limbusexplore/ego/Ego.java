@@ -6,24 +6,30 @@ import net.minecraft.resources.ResourceLocation;
 
 // 测试用 EGO，Z~A 各一条。字段对齐巴士的 EGO 数据结构：
 // 多资源消耗组合、觉醒/侵蚀双技能、理智消耗、罪孽抗性覆盖、被动。
+// noiseR/G/B：侵蚀着色器里三维柏林噪声对 R/G/B 通道的权重（每个 EGO 一套色调）。
 // 换正式内容时只动这个枚举，下面的 key/texture 方法不用改。
 public enum Ego {
 
     TEST_ZAYIN("test_zayin_ego", RiskLevel.ZAYIN, SinType.SLOTH,
             new SinCost[]{new SinCost(SinType.SLOTH, 1), new SinCost(SinType.PRIDE, 1)},
-            10, SinType.SLOTH, 0.5f),
+            10, SinType.SLOTH, 0.5f,
+            0.15f, 0.55f, 0.95f),
     TEST_TETH("test_teth_ego", RiskLevel.TETH, SinType.LUST,
             new SinCost[]{new SinCost(SinType.LUST, 2)},
-            15, SinType.ENVY, 1.5f),
+            15, SinType.ENVY, 1.5f,
+            0.95f, 0.30f, 0.60f),
     TEST_HE("test_he_ego", RiskLevel.HE, SinType.GLUTTONY,
             new SinCost[]{new SinCost(SinType.GLUTTONY, 3), new SinCost(SinType.ENVY, 1)},
-            20, SinType.GLUTTONY, 0.5f),
+            20, SinType.GLUTTONY, 0.5f,
+            0.30f, 0.75f, 0.95f),
     TEST_WAW("test_waw_ego", RiskLevel.WAW, SinType.WRATH,
             new SinCost[]{new SinCost(SinType.WRATH, 2), new SinCost(SinType.SLOTH, 2)},
-            25, SinType.PRIDE, 1.5f),
+            25, SinType.PRIDE, 1.5f,
+            0.95f, 0.40f, 0.30f),
     TEST_ALEPH("test_aleph_ego", RiskLevel.ALEPH, SinType.GLOOM,
             new SinCost[]{new SinCost(SinType.GLOOM, 4), new SinCost(SinType.WRATH, 2)},
-            30, SinType.GLOOM, 0.5f);
+            30, SinType.GLOOM, 0.5f,
+            0.55f, 0.25f, 0.90f);
 
     public final String id;
     public final RiskLevel level;
@@ -36,9 +42,14 @@ public enum Ego {
     // 使用 EGO 后覆盖自身这份罪孽抗性为 resistanceRate 倍
     public final SinType resistanceSin;
     public final float resistanceRate;
+    // 侵蚀着色器三维柏林噪声的 RGB 权重
+    public final float noiseR;
+    public final float noiseG;
+    public final float noiseB;
 
     Ego(String id, RiskLevel level, SinType sin, SinCost[] costs, int sanityCost,
-        SinType resistanceSin, float resistanceRate) {
+        SinType resistanceSin, float resistanceRate,
+        float noiseR, float noiseG, float noiseB) {
         this.id = id;
         this.level = level;
         this.sin = sin;
@@ -46,6 +57,9 @@ public enum Ego {
         this.sanityCost = sanityCost;
         this.resistanceSin = resistanceSin;
         this.resistanceRate = resistanceRate;
+        this.noiseR = noiseR;
+        this.noiseG = noiseG;
+        this.noiseB = noiseB;
     }
 
     public String displayKey() {

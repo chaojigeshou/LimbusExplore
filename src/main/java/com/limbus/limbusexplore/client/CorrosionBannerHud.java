@@ -126,6 +126,12 @@ public final class CorrosionBannerHud {
         s.getUniform("Time").set(time);
         s.getUniform("Intensity").set(intensity);
         s.getUniform("Mode").set(mode);
+        // 三维柏林噪声权重跟 EGO 类型走（activeEgo 的 noiseR/G/B）
+        com.limbus.limbusexplore.ego.Ego activeEgo = ClientEgoState.activeEgo();
+        s.getUniform("Weight").set(
+                activeEgo != null ? activeEgo.noiseR : 0.5f,
+                activeEgo != null ? activeEgo.noiseG : 0.5f,
+                activeEgo != null ? activeEgo.noiseB : 0.5f);
         s.setSampler("SamplerFlash", 0);
         s.setSampler("SamplerBar", 1);
         RenderSystem.setShader(() -> s);
