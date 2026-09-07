@@ -36,22 +36,16 @@ public final class SinResourcesHud {
         SinType[] sins = SinType.values();
         int y = (screenHeight - ROW_HEIGHT * sins.length) / 2;
 
-        // EGO 状态行（30s 倒计时），在理智行上面
+        // EGO 状态行（30s 倒计时）
         if (ClientEgoState.isInState()) {
             Ego ego = ClientEgoState.activeEgo();
             if (ego != null) {
                 graphics.drawString(minecraft.font,
                         Component.translatable("ego.limbusexplore.state_hud",
                                 Component.translatable(ego.displayKey()), ClientEgoState.remainingSeconds()),
-                        LEFT + 1, y - 30, ClientEgoState.isCorroded() ? 0xFFE04B4B : 0xFFE8C547, true);
+                        LEFT + 1, y - 14, ClientEgoState.isCorroded() ? 0xFFE04B4B : 0xFFE8C547, true);
             }
         }
-
-        // 理智值单独一行，正绿负红
-        int sanity = ClientSanity.get();
-        graphics.drawString(minecraft.font,
-                Component.translatable("sanity.limbusexplore.hud", (sanity >= 0 ? "+" : "") + sanity),
-                LEFT + 1, y - 14, sanity < 0 ? 0xFFE04B4B : 0xFF7FBF7F, true);
 
         for (SinType sin : sins) {
             // 图标底衬，地形太亮的时候看得清

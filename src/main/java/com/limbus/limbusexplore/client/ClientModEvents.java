@@ -43,6 +43,8 @@ public final class ClientModEvents {
     @SubscribeEvent
     public static void onRegisterGuiOverlays(RegisterGuiOverlaysEvent event) {
         event.registerAboveAll("sin_resources", SinResourcesHud::render);
+        event.registerAboveAll("sanity_bar", SanityBarHud::render);
+        event.registerAboveAll("corrosion_banner", CorrosionBannerHud::render);
     }
 
     @SubscribeEvent

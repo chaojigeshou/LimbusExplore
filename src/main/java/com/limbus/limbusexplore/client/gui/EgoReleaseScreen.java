@@ -16,15 +16,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.glfw.GLFW;
 
-// R 键打开。已装备的 EGO 横排卡片（Z 最左 A 最右，空槽跳过）。
-// 短按（<500ms）= 释放当前形态；长按（>=500ms）= 切成侵蚀态（卡片变红）；
+// R 键打开。已装备的 EGO 竖排卡片（Z 最左 A 最右，空槽跳过）。
+// 短按（<500ms）= 释放当前形态；长按（>=500ms）= 切成侵蚀态（卡片变红、左侧进度条从底到顶、轻微抖动）；
 // 再短按释放的就是侵蚀版；右键取消侵蚀态。R/ESC 关闭。
 // 注意：卡片序号是「可见顺序」，槽位号是 0..4，两者别搞混（setCorroded 要槽位号）。
 public class EgoReleaseScreen extends Screen {
 
-    private static final int ITEM_W = 124;
-    private static final int ITEM_H = 88;
-    private static final int ITEM_GAP = 6;
+    private static final int ITEM_W = 96;
+    private static final int ITEM_H = 122;
+    private static final int ITEM_GAP = 8;
     private static final long LONG_PRESS_MS = 500;
 
     private int pressSlot = -1;
@@ -120,7 +120,8 @@ public class EgoReleaseScreen extends Screen {
             return;
         }
 
-        int y = cardY(height);
+        int y0 = cardY(height);
+        boolean pressing = pressSlot >= 0 && System.currentTimeMillis() - pressStart < LONG_PRESS_MS;
         int visibleIndex = 0;
         for (int slot = 0; slot < ClientEgoLoadout.SLOTS; slot++) {
             Ego ego = ClientEgoLoadout.get(slot);
@@ -128,7 +129,14 @@ public class EgoReleaseScreen extends Screen {
                 continue;
             }
             int x = cardX(visibleIndex, visible.length, width);
+            int y = y0;
             visibleIndex++;
+
+            // 长按中的卡片轻微抖动（只晃视觉，命中判定仍用原坐标）
+            if (slot == pressSlot && pressing) {
+                x += (int) (Math.random() * 3) - 1;
+                y += (int) (Math.random() * 3) - 1;
+            }
 
             boolean corroded = ClientEgoLoadout.isCorroded(slot);
             boolean fits = ClientSinResources.canPayClient(ego.costs);
@@ -142,48 +150,55 @@ public class EgoReleaseScreen extends Screen {
 
             int textColor = corroded ? 0xFFFF9E9E : (fits ? 0xFFFFFF : 0xFF909090);
 
-            // 图片 + 名称 + 等级
-            gui.blit(textureOf(minecraft, ego), x + 5, y + 5, 0, 0, 32, 32, 32, 32);
-            gui.drawString(font, minecraft.font.plainSubstrByWidth(
-                    Component.translatable(ego.displayKey()).getString(), ITEM_W - 48), x + 42, y + 7, textColor, false);
-            gui.drawString(font, Component.translatable(ego.level.displayKey()), x + 42, y + 19, ego.level.color, false);
+            // 图片（居中）+ 名称 + 等级
+            gui.blit(textureOf(minecraft, ego), x + (ITEM_W - 32) / 2, y + 6, 0, 0, 32, 32, 32, 32);
+            gui.drawCenteredString(font, minecraft.font.plainSubstrByWidth(
+                    Component.translatable(ego.displayKey()).getString(), ITEM_W - 10), x + ITEM_W / 2, y + 42, textColor);
+            gui.drawCenteredString(font, Component.translatable(ego.level.displayKey()),
+                    x + ITEM_W / 2, y + 54, ego.level.color);
 
             // 介绍（两行截断）
             String desc = Component.translatable(ego.descKey()).getString();
-            String line1 = minecraft.font.plainSubstrByWidth(desc, ITEM_W - 12);
+            String line1 = minecraft.font.plainSubstrByWidth(desc, ITEM_W - 10);
             String line2 = desc.length() > line1.length()
-                    ? minecraft.font.plainSubstrByWidth(desc.substring(line1.length()), ITEM_W - 12) : "";
-            gui.drawString(font, line1, x + 6, y + 40, 0xFFBBBBBB, false);
+                    ? minecraft.font.plainSubstrByWidth(desc.substring(line1.length()), ITEM_W - 10) : "";
+            gui.drawString(font, line1, x + (ITEM_W - font.width(line1)) / 2, y + 66, 0xFFBBBBBB, false);
             if (!line2.isEmpty()) {
-                gui.drawString(font, line2, x + 6, y + 50, 0xFFBBBBBB, false);
+                gui.drawString(font, line2, x + (ITEM_W - font.width(line2)) / 2, y + 76, 0xFFBBBBBB, false);
             }
 
-            // 所需资源（组合）；侵蚀态按 1.5 倍向上取整显示
-            int costX = x + 5;
-            int costY = y + 63;
+            // 所需资源（组合，每个一行）；侵蚀态按 1.5 倍向上取整显示
+            int costY = y + 90;
             for (SinCost cost : ego.costs) {
                 int amount = corroded ? (cost.amount() * 3 + 1) / 2 : cost.amount();
-                gui.blit(cost.sin().texture(), costX, costY, 0, 0, 14, 14, 16, 16);
+                gui.blit(cost.sin().texture(), x + 8, costY, 0, 0, 14, 14, 16, 16);
                 String label = Component.translatable(cost.sin().displayKey()).getString() + " ×" + amount;
                 boolean enough = !corroded && minecraft.player != null
                         && ClientSinResources.get(cost.sin()) >= cost.amount();
-                gui.drawString(font, label, costX + 17, costY + 1, enough ? 0xFFD8D8D8 : 0xFFE04B4B, false);
-                costX += 17 + font.width(label) + 8;
+                gui.drawString(font, label, x + 25, costY + 1, enough ? 0xFFD8D8D8 : 0xFFE04B4B, false);
+                costY += 12;
             }
 
             // 理智消耗（侵蚀态 1.5 倍 + 允许扣穿），不够红
             int sanityCost = corroded ? (ego.sanityCost * 3 + 1) / 2 : ego.sanityCost;
-            gui.drawString(font, "理智 -" + sanityCost, x + 5, y + 75,
-                    (corroded || sanityFits) ? 0xFF9FD8FF : 0xFFE04B4B, false);
+            gui.drawCenteredString(font, "理智 -" + sanityCost, x + ITEM_W / 2, costY + 1,
+                    (corroded || sanityFits) ? 0xFF9FD8FF : 0xFFE04B4B);
 
             // 侵蚀态角标
             if (corroded) {
                 gui.drawString(font, "侵蚀", x + ITEM_W - 30, y + 4, 0xFFE04B4B, false);
             }
+
+            // 长按进度条：卡片左缘，从底部往顶部填
+            if (slot == pressSlot && pressing) {
+                float progress = (System.currentTimeMillis() - pressStart) / (float) LONG_PRESS_MS;
+                int barH = (int) (progress * (ITEM_H - 8));
+                gui.fill(x + 3, y + ITEM_H - 4 - barH, x + 6, y + ITEM_H - 4, 0xFFE8C547);
+            }
         }
 
         gui.drawCenteredString(font, Component.translatable("screen.limbusexplore.ego_release_hint"),
-                width / 2, y + ITEM_H + 8, 0xFFAAAAAA);
+                width / 2, y0 + ITEM_H + 8, 0xFFAAAAAA);
     }
 
     @Override

@@ -24,10 +24,11 @@ public final class EgoReleaseClient {
 
         EgoApi.ReleaseResult result = EgoApi.ReleaseResult.values()[resultOrdinal];
         if (result == EgoApi.ReleaseResult.CORRODED) {
-            // 侵蚀释放：红色火焰粒子 + 提示
+            // 侵蚀释放：红色火焰粒子 + 提示 + 顶部侵蚀闪光横幅
             minecraft.player.displayClientMessage(
                     Component.translatable("ego.limbusexplore.corroded",
                             Component.translatable(ego.displayKey())), true);
+            CorrosionBannerHud.flash();
             for (int i = 0; i < 14; i++) {
                 double spread = minecraft.player.getRandom().nextGaussian() * 0.45;
                 minecraft.player.level().addParticle(ParticleTypes.SOUL_FIRE_FLAME,
