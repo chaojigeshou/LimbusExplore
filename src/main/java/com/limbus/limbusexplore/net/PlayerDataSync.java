@@ -1,10 +1,12 @@
 package com.limbus.limbusexplore.net;
 
 import com.limbus.limbusexplore.LimbusExplore;
+import com.limbus.limbusexplore.chaos.ChaosApi;
 import com.limbus.limbusexplore.ego.EgoStateApi;
 import com.limbus.limbusexplore.sanity.SanityCapabilities;
 import com.limbus.limbusexplore.sin.ModCapabilities;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -50,6 +52,7 @@ public final class PlayerDataSync {
         syncSin(player);
         syncSanity(player);
         EgoStateApi.sync(player);
+        ChaosApi.sync(player);   // Player 本身就是 LivingEntity
     }
 
     /** 罪孽资源全量同步（SinApi 修改后也调它）。 */

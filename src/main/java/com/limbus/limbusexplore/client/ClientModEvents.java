@@ -45,6 +45,7 @@ public final class ClientModEvents {
         event.registerAboveAll("sin_resources", SinResourcesHud::render);
         event.registerAboveAll("sanity_bar", SanityBarHud::render);
         event.registerAboveAll("corrosion_banner", CorrosionBannerHud::render);
+        event.registerAboveAll("chaos_bar", ChaosBarHud::render);
     }
 
     @SubscribeEvent

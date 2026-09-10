@@ -117,6 +117,34 @@ void   EgoStateApi.registerListener(EgoStateListener);            // 挂三段�
 void   EgoStateApi.sync(Player);                                  // 全量同步（PlayerEgoStateSync 自动调）
 ```
 
+## 混乱值（Stagger）
+
+满值起步的"抗性条"：受击扣混乱值，**扣到 0 进入混乱状态**，持续 **15 秒**，结束后回满重新累积。玩家和怪物都有。
+
+| 类 | 说明 |
+|----|------|
+| `chaos/Chaos` | 容器：`MAX=100`、混乱计时、自然回复（40 tick +1）、定身锁定点、NBT |
+| `chaos/ChaosCapabilities` + `ChaosProvider` | capability 挂载（键 `limbusexplore:chaos`，挂 **LivingEntity**，玩家与怪物共用） |
+| `chaos/ChaosApi` | 入口与服务端状态机：`get/isInChaos/remainingSeconds/set/damage/breakNow/endChaos/reset/tick/sync` |
+| `chaos/ChaosCombat` | 伤害挂钩（`LivingHurtEvent`）、tick 驱动、混乱中禁止攻击（`AttackEntityEvent`） |
+| `chaos/ChaosListener` | 三段钩子：`beforeEnter` / `whileInChaos`（每秒）/ `onEnd` |
+| `net/ChaosSyncPacket` | S2C 同步（`PlayerDataSync` 登录/换维/重生全量 + 变化时自动） |
+| `client/ClientChaos` | 客户端镜像 |
+| `client/ChaosBarHud` | 混乱条（快捷栏上方，黄条；混乱中红色闪烁） |
+| `client/gui/ChaosLockScreen` | 混乱锁定界面（吞掉所有输入，含 ESC，不可关闭） |
+| `command/ChaosCommands` | `/chaos get|set|damage|break|reset`（权限 2） |
+
+```java
+Chaos.MAX = 100;                          // 混乱值上限
+Chaos.CHAOS_TICKS = 20 * 15;              // 混乱持续 15 秒
+Chaos.REGEN_INTERVAL = 40;                // 不受击时每 40 tick 回 1 点
+ChaosApi.CHAOS_DAMAGE_MULTIPLIER = 1.5f;  // 混乱中受到的伤害倍率
+```
+
+- 混乱伤害 = 原伤害 × 1.0 × 类型倍率（近战 1.0 / 弹射物 0.8 / 爆炸及其它 1.2）
+- **混乱状态**：玩家被定身（每 tick 拉回锁定点，客户端输入由 `ChaosLockScreen` 全部吞掉）＋ 禁止攻击 ＋ 禁止释放 EGO（`EgoApi` 返回 `IN_CHAOS`）；怪物停止 AI（清目标 + 停寻路 + 清速度）
+- 进入混乱时发一圈 CRIT 粒子（服务端广播，怪物混乱也能看见）
+
 ## 理智值
 
 | 类 | 说明 |

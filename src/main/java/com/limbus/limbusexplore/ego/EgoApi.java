@@ -1,5 +1,6 @@
 package com.limbus.limbusexplore.ego;
 
+import com.limbus.limbusexplore.chaos.ChaosApi;
 import com.limbus.limbusexplore.sanity.SanityApi;
 import com.limbus.limbusexplore.sin.SinApi;
 import net.minecraft.server.level.ServerPlayer;
@@ -8,7 +9,7 @@ import net.minecraft.server.level.ServerPlayer;
  * 释放判定入口（服务端）。
  * 普通释放：罪孽组合 + 理智都够才扣，成功进入 30s EGO 状态。
  * 侵蚀释放：消耗 ×1.5 向上取整，罪孽允许透支为负，理智不查下限直接扣，也进入 EGO 状态。
- * 状态进行中禁止再次释放（两种都不行），返回 IN_EGO_STATE。
+ * EGO 状态中或混乱状态中禁止释放。
  */
 public final class EgoApi {
 
@@ -17,7 +18,8 @@ public final class EgoApi {
         CORRODED,       // 侵蚀释放，资源透支扣负，进入 EGO 状态
         SIN_LACK,       // 罪孽资源不够（普通释放）
         SANITY_LACK,    // 理智不够（普通释放，扣完跌破 -45）
-        IN_EGO_STATE    // 已经处于 EGO 状态中，禁止释放
+        IN_EGO_STATE,   // 已经处于 EGO 状态中，禁止释放
+        IN_CHAOS        // 混乱状态中，禁止释放
     }
 
     private EgoApi() {
@@ -25,6 +27,9 @@ public final class EgoApi {
 
     // 只判断不动手，给 UI 预检用
     public static ReleaseResult check(ServerPlayer player, Ego ego) {
+        if (ChaosApi.isInChaos(player)) {
+            return ReleaseResult.IN_CHAOS;
+        }
         if (EgoStateApi.isInState(player)) {
             return ReleaseResult.IN_EGO_STATE;
         }
@@ -38,8 +43,8 @@ public final class EgoApi {
     }
 
     public static ReleaseResult release(ServerPlayer player, Ego ego) {
-        if (EgoStateApi.isInState(player)) {
-            return ReleaseResult.IN_EGO_STATE;
+        if (ChaosApi.isInChaos(player)) {
+            return ReleaseResult.IN_CHAOS;
         }
         ReleaseResult result = check(player, ego);
         if (result != ReleaseResult.RELEASED) {
@@ -53,6 +58,9 @@ public final class EgoApi {
 
     /** 侵蚀释放：×1.5 向上取整的罪孽组合（可透支）+ 理智不查下限，成功进入 EGO 状态。 */
     public static ReleaseResult releaseCorrosion(ServerPlayer player, Ego ego) {
+        if (ChaosApi.isInChaos(player)) {
+            return ReleaseResult.IN_CHAOS;
+        }
         if (EgoStateApi.isInState(player)) {
             return ReleaseResult.IN_EGO_STATE;
         }

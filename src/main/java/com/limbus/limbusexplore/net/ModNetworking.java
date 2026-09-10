@@ -42,6 +42,9 @@ public final class ModNetworking {
         CHANNEL.registerMessage(nextId++, EgoStateSyncPacket.class,
                 EgoStateSyncPacket::encode, EgoStateSyncPacket::decode, EgoStateSyncPacket::handle,
                 Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(nextId++, ChaosSyncPacket.class,
+                ChaosSyncPacket::encode, ChaosSyncPacket::decode, ChaosSyncPacket::handle,
+                Optional.of(NetworkDirection.PLAY_TO_CLIENT));
     }
 
     public static <T> void sendToPlayer(ServerPlayer player, T packet) {

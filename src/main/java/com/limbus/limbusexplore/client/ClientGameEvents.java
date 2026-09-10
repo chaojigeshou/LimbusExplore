@@ -1,6 +1,7 @@
 package com.limbus.limbusexplore.client;
 
 import com.limbus.limbusexplore.LimbusExplore;
+import com.limbus.limbusexplore.client.gui.ChaosLockScreen;
 import com.limbus.limbusexplore.client.gui.EgoLoadoutScreen;
 import com.limbus.limbusexplore.client.gui.EgoReleaseScreen;
 import net.minecraft.client.Minecraft;
@@ -11,7 +12,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 // FORGE 总线、仅客户端：按键轮询和 tick 都放这。
-// 三个按键都是点击型（consumeClick），按住判别那套不需要。
+// 混乱状态优先级最高：强制锁屏，期间不响应任何按键。
 @Mod.EventBusSubscriber(modid = LimbusExplore.MODID, value = Dist.CLIENT)
 public final class ClientGameEvents {
 
@@ -27,6 +28,17 @@ public final class ClientGameEvents {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
             return;
+        }
+
+        // 混乱锁定：混乱期间强制打开锁屏（吞掉所有输入），结束自动关掉
+        if (ClientChaos.isInChaos()) {
+            if (!(minecraft.screen instanceof ChaosLockScreen)) {
+                minecraft.setScreen(new ChaosLockScreen());
+            }
+            return;
+        }
+        if (minecraft.screen instanceof ChaosLockScreen) {
+            minecraft.setScreen(null);
         }
 
         if (ClientModEvents.TOGGLE_SIN_HUD.consumeClick() && minecraft.screen == null) {

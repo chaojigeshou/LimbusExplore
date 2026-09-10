@@ -51,6 +51,9 @@ public final class EgoReleaseClient {
         } else if (result == EgoApi.ReleaseResult.IN_EGO_STATE) {
             minecraft.player.displayClientMessage(
                     Component.translatable("ego.limbusexplore.in_ego_state"), true);
+        } else if (result == EgoApi.ReleaseResult.IN_CHAOS) {
+            minecraft.player.displayClientMessage(
+                    Component.translatable("ego.limbusexplore.in_chaos"), true);
         } else if (result == EgoApi.ReleaseResult.SANITY_LACK) {
             minecraft.player.displayClientMessage(
                     Component.translatable("ego.limbusexplore.sanity_lack",
