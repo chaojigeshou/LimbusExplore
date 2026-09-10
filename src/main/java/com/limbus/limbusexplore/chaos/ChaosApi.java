@@ -1,6 +1,7 @@
 package com.limbus.limbusexplore.chaos;
 
 import com.limbus.limbusexplore.net.ChaosSyncPacket;
+import com.limbus.limbusexplore.net.EntityChaosPacket;
 import com.limbus.limbusexplore.net.ModNetworking;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -106,6 +107,9 @@ public final class ChaosApi {
         for (ChaosListener listener : LISTENERS) {
             listener.onEnd(entity, chaos);
         }
+        if (!(entity instanceof ServerPlayer)) {
+            EntityChaosPacket.broadcast(entity, 0);
+        }
         sync(entity);
     }
 
@@ -130,6 +134,10 @@ public final class ChaosApi {
             serverLevel.sendParticles(ParticleTypes.CRIT,
                     entity.getX(), entity.getY() + 1.0, entity.getZ(),
                     24, 0.5, 0.8, 0.5, 0.15);
+        }
+        // 怪物：广播给附近玩家，客户端在它头顶画混乱图（玩家自己不需要，走 ChaosSyncPacket）
+        if (!(entity instanceof ServerPlayer)) {
+            EntityChaosPacket.broadcast(entity, chaos.getChaosTicks());
         }
         sync(entity);
     }

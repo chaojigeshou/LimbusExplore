@@ -129,7 +129,10 @@ void   EgoStateApi.sync(Player);                                  // 全量同�
 | `chaos/ChaosCombat` | 伤害挂钩（`LivingHurtEvent`）、tick 驱动、混乱中禁止攻击（`AttackEntityEvent`） |
 | `chaos/ChaosListener` | 三段钩子：`beforeEnter` / `whileInChaos`（每秒）/ `onEnd` |
 | `net/ChaosSyncPacket` | S2C 同步（`PlayerDataSync` 登录/换维/重生全量 + 变化时自动） |
-| `client/ClientChaos` | 客户端镜像 |
+| `net/EntityChaosPacket` | 怪物混乱状态广播（发给追踪该实体的玩家） |
+| `client/ClientChaos` | 客户端镜像（玩家自己的混乱值） |
+| `client/ClientEntityChaos` | 客户端记录哪些生物在混乱（按 tick 倒数，到点自动清） |
+| `client/ChaosMarkRenderer` | 混乱生物头顶的"陷入混乱"图（billboard 始终面向玩家，最后 1 秒淡出） |
 | `client/ChaosBarHud` | 混乱条（快捷栏上方，黄条；混乱中红色闪烁） |
 | `client/gui/ChaosLockScreen` | 混乱锁定界面（吞掉所有输入，含 ESC，不可关闭） |
 | `command/ChaosCommands` | `/chaos get|set|damage|break|reset`（权限 2） |

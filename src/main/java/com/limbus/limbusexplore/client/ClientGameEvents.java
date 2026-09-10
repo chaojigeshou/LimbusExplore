@@ -30,6 +30,8 @@ public final class ClientGameEvents {
             return;
         }
 
+        ClientEntityChaos.tick();   // 怪物混乱状态的本地倒数
+
         // 混乱锁定：混乱期间强制打开锁屏（吞掉所有输入），结束自动关掉
         if (ClientChaos.isInChaos()) {
             if (!(minecraft.screen instanceof ChaosLockScreen)) {

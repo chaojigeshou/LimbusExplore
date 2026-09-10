@@ -48,10 +48,18 @@ public final class ModNetworking {
         CHANNEL.registerMessage(nextId++, ResistanceSyncPacket.class,
                 ResistanceSyncPacket::encode, ResistanceSyncPacket::decode, ResistanceSyncPacket::handle,
                 Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        CHANNEL.registerMessage(nextId++, EntityChaosPacket.class,
+                EntityChaosPacket::encode, EntityChaosPacket::decode, EntityChaosPacket::handle,
+                Optional.of(NetworkDirection.PLAY_TO_CLIENT));
     }
 
     public static <T> void sendToPlayer(ServerPlayer player, T packet) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
+    }
+
+    /** 发给所有能看到这个实体的玩家（怪物状态广播用） */
+    public static <T> void sendToTracking(net.minecraft.world.entity.Entity entity, T packet) {
+        CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> entity), packet);
     }
 
     public static void sendToServer(Object packet) {
