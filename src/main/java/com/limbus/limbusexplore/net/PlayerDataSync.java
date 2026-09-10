@@ -2,6 +2,7 @@ package com.limbus.limbusexplore.net;
 
 import com.limbus.limbusexplore.LimbusExplore;
 import com.limbus.limbusexplore.chaos.ChaosApi;
+import com.limbus.limbusexplore.combat.ResistanceApi;
 import com.limbus.limbusexplore.ego.EgoStateApi;
 import com.limbus.limbusexplore.sanity.SanityCapabilities;
 import com.limbus.limbusexplore.sin.ModCapabilities;
@@ -53,6 +54,7 @@ public final class PlayerDataSync {
         syncSanity(player);
         EgoStateApi.sync(player);
         ChaosApi.sync(player);   // Player 本身就是 LivingEntity
+        ResistanceApi.sync(player);
     }
 
     /** 罪孽资源全量同步（SinApi 修改后也调它）。 */

@@ -1,0 +1,8 @@
+{
+  "values": [
+    "minecraft:trident", "minecraft:bow", "minecraft:crossbow",
+    "minecraft:wooden_hoe", "minecraft:stone_hoe", "minecraft:iron_hoe",
+    "minecraft:golden_hoe", "minecraft:diamond_hoe", "minecraft:netherite_hoe",
+    "minecraft:arrow", "minecraft:spectral_arrow"
+  ]
+}

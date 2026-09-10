@@ -165,6 +165,46 @@ boolean SanityApi.consume(Player, int);
 boolean SanityApi.isInChaos(Player);      // get() <= Sanity.MIN
 ```
 
+## 三系伤害与抗性
+
+伤害分三系：**斩击 / 突刺 / 打击**；抗性倍率语义与图书馆、巴士一致：
+`2.0 致命 / 1.5 弱点 / 1.0 普通 / 0.5 耐性 / 0.0 免疫`。
+
+| 类 | 说明 |
+|----|------|
+| `combat/DamageKind` | 三系枚举，附带物品 tag / 攻击者 tag / 伤害类型 tag 的 key |
+| `combat/DamageKindApi` | 判定入口（代码注册 → 数据包 tag → 兜底推断），另有 `heldKind(Player)` |
+| `combat/Resistance` | 三系抗性容器 + 分级常量（FATAL/WEAK/NORMAL/ENDURED/IMMUNE） |
+| `combat/ResistanceCapabilities` + `ResistanceProvider` | capability 挂 LivingEntity（玩家+怪物），含实体 tag 的 `tierTag()` |
+| `combat/ResistanceApi` | `get/set/apply/reset/multiplier/sync`；tag 默认值只在首次查询时套一次 |
+| `combat/CombatFormula` | 公式骨架：`原伤害 × 抗性 × 等级差修正`（等级差现为 1.0，钩子已留） |
+| `combat/CombatHandler` | `LivingHurtEvent` 唯一入口：判系 → 乘抗性 → 喂混乱值；混乱中改走 ×1.5 |
+| `net/ResistanceSyncPacket` | 玩家抗性同步（UI 用） |
+| `client/ClientResistance` | 客户端镜像 |
+| `command/ResistanceCommands` | `/resistance get|set|preset`（权限 2） |
+
+**其他 mod 怎么接**（都不需要写代码，加数据包 json 即可）：
+
+```
+data/<你的包>/tags/items/weapons/slash.json          → 你的武器算斩击（pierce / blunt 同理）
+data/<你的包>/tags/entity_types/attackers/pierce.json → 你的怪物用突刺打人
+data/<你的包>/tags/damage_type/damage/slash.json     → 你的伤害类型算斩击
+```
+
+怪物抗性同理，往这些 tag 里塞实体 id：
+
+```
+#limbusexplore:resist/slash/{fatal,weak,endured,immune}
+#limbusexplore:resist/pierce/{...}
+#limbusexplore:resist/blunt/{...}
+```
+
+有依赖的 mod 也可以直接调 API：`DamageKindApi.registerItem/registerAttacker/registerDamageType`、
+`ResistanceApi.set(entity, kind, value)`。
+
+兼容性约定：只用 `LivingHurtEvent` **乘算**（不替换伤害、不取消事件、不改原版类、不注册自定义伤害类型），
+未知来源一律兜底为打击；`damageKindEnabled` 配置项可整体关闭倍率。
+
 ## 键位与命令
 
 | 键位 | 功能 |
