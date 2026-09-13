@@ -115,6 +115,13 @@ repositories {
     // Put repositories for dependencies here
     // ForgeGradle automatically adds the Forge maven and Maven Central for you
 
+    // Jade（玉）走 Modrinth 官方 maven，省得把第三方 jar 塞进仓库
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+        content { includeGroup 'maven.modrinth' }
+    }
+
     // If you have mod jar dependencies in ./libs, you can declare them as a repository like so.
     // See https://docs.gradle.org/current/userguide/declaring_repositories.html#sub:flat_dir_resolver
     // flatDir {
@@ -132,7 +139,7 @@ dependencies {
 
     // Jade（玉）兼容：只编译期引用它的 API，运行时不依赖。
     // 没装 Jade 的客户端/服务器也照常跑，插件类由 Jade 自己扫描 @WailaPlugin 才会加载。
-    compileOnly fg.deobf(files("libs/Jade-1.20.1-Forge-11.13.3.jar"))
+    compileOnly fg.deobf("maven.modrinth:jade:11.13.3+forge")
 
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
