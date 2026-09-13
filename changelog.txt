@@ -36,6 +36,19 @@ Limbus Explore 更新日志
   - chaosEnabled：关掉混乱系统，挨打不扣混乱值、不进混乱状态
   - chaosMarkEnabled：纯客户端开关，不画生物头顶那张混乱标记
   - jadeCompatEnabled：不往 Jade 送数据；Jade 那边也有自己的开关，两处任关一处即生效
+- 新增 EGO 的抗性覆盖：开了 EGO 之后自身那一系伤害抗性按 EGO 表里的倍率走，30 秒结束还原
+  - 每条 EGO 现在写的是「哪一系伤害 + 几倍」：ZAYIN 打击 ×0.5、TETH 斩击 ×1.5、HE 突刺 ×0.5、WAW 打击 ×1.5、ALEPH 斩击 ×0.5
+  - 抗性容器分了基础值和覆盖层两层，覆盖是临时的，结束清掉就回原样，不会把临时值写死成常驻抗性
+  - 界面和 Jade 看到的是覆盖之后的实际生效值，不用另开一份显示逻辑
+- 新增 单元测试：gradlew test，64 个用例，只测不启动游戏的纯逻辑（容器边界、倍率、状态机、同步包编解码）
+  - 写完当场抓到两个老 bug，见下面的修复
+- 修复 侵蚀透支出来的负罪孽值保存后读回来被抹成 0（读档时走的是带下限的 set）
+- 修复 抗性存档会把 EGO 的临时覆盖当成基础值存下来，导致状态结束还原不回去
+- 优化 侵蚀着色器改成走 RegisterShadersEvent 官方注册（原来是自己 new 了缓存，资源包重载后会指着旧的 GL program）
+- 优化 全屏 quad 改用带矩阵的 vertex 重载，编译期不再有过时 API 警告
+- 优化 命名统一：sin/ModCapabilities → SinCapabilities，client/ego/ClientEgoLoadout → client/ClientEgoLoadout
+- 优化 配置项引用统一走 import，只有入口类因为跟 Forge 的 ModConfig 撞名还留着一处全限定名
+- 优化 补上两条注释里早就改掉的类名（net/PlayerSinSync、net/PlayerSanitySync → PlayerDataSync）
 - 修复 侵蚀着色器贴图采样写法：GLSL 不允许 sampler 走三目运算，改成两张图都采样再选
 - 修复 着色器资源路径：ShaderInstance 只认 minecraft 命名空间，文件挪到 assets/minecraft/shaders/core
 - 修复 侵蚀一瞬间闪光的播放条件，不再依赖状态包的到达顺序

@@ -5,6 +5,7 @@ import com.limbus.limbusexplore.chaos.Chaos;
 import com.limbus.limbusexplore.chaos.ChaosApi;
 import com.limbus.limbusexplore.combat.DamageKind;
 import com.limbus.limbusexplore.combat.ResistanceApi;
+import com.limbus.limbusexplore.config.ModConfig;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
@@ -20,7 +21,7 @@ public class JadeEntityData implements IServerDataProvider<EntityAccessor> {
     @Override
     public void appendServerData(CompoundTag data, EntityAccessor accessor) {
         // 服务端侧的官方绕过入口：关掉后不再往 Jade 塞数据
-        if (!com.limbus.limbusexplore.config.ModConfig.JADE_COMPAT_ENABLED.get()) {
+        if (!ModConfig.JADE_COMPAT_ENABLED.get()) {
             return;
         }
         Entity entity = accessor.getEntity();

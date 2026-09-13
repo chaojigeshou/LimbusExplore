@@ -1,6 +1,7 @@
 package com.limbus.limbusexplore.client;
 
 import com.limbus.limbusexplore.LimbusExplore;
+import com.limbus.limbusexplore.config.ModConfig;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
@@ -41,7 +42,7 @@ public final class ChaosMarkRenderer {
             return;
         }
         // 官方绕过入口：客户端配置里能关掉这张图
-        if (!com.limbus.limbusexplore.config.ModConfig.CHAOS_MARK_ENABLED.get()) {
+        if (!ModConfig.CHAOS_MARK_ENABLED.get()) {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();

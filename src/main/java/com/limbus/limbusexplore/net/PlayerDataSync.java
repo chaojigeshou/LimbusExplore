@@ -5,7 +5,7 @@ import com.limbus.limbusexplore.chaos.ChaosApi;
 import com.limbus.limbusexplore.combat.ResistanceApi;
 import com.limbus.limbusexplore.ego.EgoStateApi;
 import com.limbus.limbusexplore.sanity.SanityCapabilities;
-import com.limbus.limbusexplore.sin.ModCapabilities;
+import com.limbus.limbusexplore.sin.SinCapabilities;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -62,7 +62,7 @@ public final class PlayerDataSync {
         if (!(player instanceof ServerPlayer serverPlayer)) {
             return;
         }
-        player.getCapability(ModCapabilities.SIN_RESOURCES).ifPresent(resources ->
+        player.getCapability(SinCapabilities.SIN_RESOURCES).ifPresent(resources ->
                 ModNetworking.sendToPlayer(serverPlayer, new SinSyncPacket(resources.toArray())));
     }
 

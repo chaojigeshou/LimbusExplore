@@ -1,6 +1,7 @@
 package com.limbus.limbusexplore.client;
 
 import com.limbus.limbusexplore.LimbusExplore;
+import com.limbus.limbusexplore.ego.Ego;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.BufferUploader;
@@ -13,6 +14,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
+import org.joml.Matrix4f;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -34,15 +36,18 @@ public final class CorrosionBannerHud {
 
     // ShaderInstance 只认 minecraft:shaders/core/ 命名空间（硬编码），
     // 所以 shader 文件放在 assets/minecraft/shaders/core/ 下，加载用裸名即可。
-    private static final String SHADER_NAME = "corrosion_erosion";
+    // 注册在 ClientModEvents.onRegisterShaders（MOD 总线），不在这边自己 new。
+    public static final String SHADER_NAME = "corrosion_erosion";
 
     private static final long FLASH_TOTAL = 1400;
     private static final long FADE_IN = 700;
     private static final long FADE_OUT = 700;
 
+    // 顶点已经算好了，不需要再乘矩阵，给个单位矩阵即可
+    private static final Matrix4f IDENTITY = new Matrix4f();
+
     private static long flashStart = -1;
     private static ShaderInstance shader;
-    private static boolean shaderFailed;
 
     private CorrosionBannerHud() {
     }
@@ -52,17 +57,15 @@ public final class CorrosionBannerHud {
         flashStart = System.currentTimeMillis();
     }
 
-    private static ShaderInstance shader() {
-        if (shader == null && !shaderFailed) {
-            try {
-                shader = new ShaderInstance(Minecraft.getInstance().getResourceManager(),
-                        SHADER_NAME, DefaultVertexFormat.POSITION);
-            } catch (IOException e) {
-                shaderFailed = true;
-                LOGGER.error("Failed to load corrosion shader, falling back to texture blit", e);
-            }
-        }
-        return shader;
+    /** ClientModEvents 在 RegisterShadersEvent 里回调；资源包每次重载都会再来一份新的。 */
+    public static void acceptShader(ShaderInstance instance) {
+        shader = instance;
+    }
+
+    /** shader 建不起来（json/vsh/fsh 有问题）时走这里，之后一直用贴图回退。 */
+    public static void shaderUnavailable(IOException cause) {
+        shader = null;
+        LOGGER.error("Failed to load corrosion shader, falling back to texture blit", cause);
     }
 
     // 贴图全屏（shader 不可用时的回退）
@@ -108,7 +111,7 @@ public final class CorrosionBannerHud {
         int flashTex = minecraft.getTextureManager().getTexture(FLASH).getId();
         int barTex = minecraft.getTextureManager().getTexture(BAR).getId();
 
-        ShaderInstance s = shader();
+        ShaderInstance s = shader;
         if (s == null) {
             // 回退：老的全屏贴图
             if (flashActive) {
@@ -127,7 +130,7 @@ public final class CorrosionBannerHud {
         s.getUniform("Intensity").set(intensity);
         s.getUniform("Mode").set(mode);
         // 三维柏林噪声权重跟 EGO 类型走（activeEgo 的 noiseR/G/B）
-        com.limbus.limbusexplore.ego.Ego activeEgo = ClientEgoState.activeEgo();
+        Ego activeEgo = ClientEgoState.activeEgo();
         s.getUniform("Weight").set(
                 activeEgo != null ? activeEgo.noiseR : 0.5f,
                 activeEgo != null ? activeEgo.noiseG : 0.5f,
@@ -139,13 +142,14 @@ public final class CorrosionBannerHud {
         RenderSystem.setShaderTexture(0, FLASH);
         RenderSystem.setShaderTexture(1, BAR);
 
-        // 全屏 quad（顶点 -1..1，vsh 负责转 UV 和裁剪坐标）
+        // 全屏 quad（顶点 -1..1，vsh 负责转 UV 和裁剪坐标）。
+        // 走带矩阵的 vertex：不带矩阵的那个重载在 1.20.1 已经过时了，给单位矩阵就行。
         BufferBuilder buffer = Tesselator.getInstance().getBuilder();
         buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION);
-        buffer.vertex(-1.0, -1.0, 0.0).endVertex();
-        buffer.vertex(1.0, -1.0, 0.0).endVertex();
-        buffer.vertex(1.0, 1.0, 0.0).endVertex();
-        buffer.vertex(-1.0, 1.0, 0.0).endVertex();
+        buffer.vertex(IDENTITY, -1f, -1f, 0f).endVertex();
+        buffer.vertex(IDENTITY, 1f, -1f, 0f).endVertex();
+        buffer.vertex(IDENTITY, 1f, 1f, 0f).endVertex();
+        buffer.vertex(IDENTITY, -1f, 1f, 0f).endVertex();
         BufferUploader.drawWithShader(buffer.end());
     }
 }

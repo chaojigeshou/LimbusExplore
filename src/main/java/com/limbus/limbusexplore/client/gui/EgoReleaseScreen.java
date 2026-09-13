@@ -3,7 +3,7 @@ package com.limbus.limbusexplore.client.gui;
 import com.limbus.limbusexplore.client.ClientEgoState;
 import com.limbus.limbusexplore.client.ClientSanity;
 import com.limbus.limbusexplore.client.ClientSinResources;
-import com.limbus.limbusexplore.client.ego.ClientEgoLoadout;
+import com.limbus.limbusexplore.client.ClientEgoLoadout;
 import com.limbus.limbusexplore.ego.Ego;
 import com.limbus.limbusexplore.ego.SinCost;
 import com.limbus.limbusexplore.net.EgoReleasePacket;

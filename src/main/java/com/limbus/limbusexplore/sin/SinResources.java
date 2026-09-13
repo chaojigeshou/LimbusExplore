@@ -4,7 +4,8 @@ import net.minecraft.nbt.CompoundTag;
 
 import java.util.EnumMap;
 
-// 服务端存资源的地方，负值不允许出现（侵蚀透支那套以后再说）。
+// 服务端存资源的地方。正常加减不允许负数（add / set 都夹在 0 以上），
+// 只有侵蚀释放走 forceAdd 能透支成负的，等 EGO 状态结束由 SinApi.normalizeNegative 归 0。
 // 客户端不碰这个类，它只看同步包喂过来的 ClientSinResources。
 public final class SinResources {
 
@@ -54,13 +55,14 @@ public final class SinResources {
         return array;
     }
 
+    /** 按数组写回，数组顺序就是 SinType.values()。存的是原值，负的透支额也得原样读回来。 */
     public void fromArray(int[] array) {
         if (array.length != SinType.values().length) {
             return;
         }
         int i = 0;
         for (SinType type : SinType.values()) {
-            set(type, array[i++]);
+            values.put(type, array[i++]);
         }
     }
 
@@ -71,6 +73,8 @@ public final class SinResources {
     }
 
     public void load(CompoundTag tag) {
+        // 先清零：档里缺字段或者是旧的坏格式，就当全 0，别留着上一份的残值
+        clear();
         fromArray(tag.getIntArray("values"));
     }
 }

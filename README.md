@@ -19,7 +19,7 @@ Minecraft 1.20.1 Forge mod（Forge 47.3.0）。
 |----|------|
 | `sin/SinType` | 七种罪孽枚举。`id`、`color`、`displayKey()`、`texture()`、`byId(String)`。同步包数组顺序 = `values()` 顺序 |
 | `sin/SinResources` | 服务端数据容器。`get/add/set/clear/copyFrom/toArray/fromArray/save/load`。不允许负值 |
-| `sin/ModCapabilities` + `SinResourcesProvider` | capability 定义与挂载（键 `limbusexplore:sin_resources`），玩家死亡克隆跟随 |
+| `sin/SinCapabilities` + `SinResourcesProvider` | capability 定义与挂载（键 `limbusexplore:sin_resources`），玩家死亡克隆跟随 |
 | `sin/SinApi` | 业务入口。改完自动同步客户端 |
 | `client/ClientSinResources` | 客户端镜像。`set(int[7])`、`get(SinType)`、`canPayClient(SinCost[])` |
 | `net/PlayerSinSync` | 登录/换维/重生自动全量同步；`sync(Player)` |
@@ -43,9 +43,10 @@ boolean consumeAll(Player, SinCost[]);  // 全够才一起扣
 |----|------|
 | `ego/RiskLevel` | 等级枚举：ZAYIN/TETH/HE/WAW/ALEPH。`id`、`color`、`displayKey()` |
 | `ego/SinCost` | `record SinCost(SinType sin, int amount)` |
-| `ego/Ego` | 字段：`id`、`level`、`sin`、`costs`、`sanityCost`、`resistanceSin`、`resistanceRate`；方法：`displayKey()`、`descKey()`、`awakeningKey()`、`corrosionKey()`、`passiveKey()`、`texture()`、`byId(String)` |
+| `ego/Ego` | 字段：`id`、`level`、`sin`、`costs`、`sanityCost`、`resistanceKind`、`resistanceRate`；方法：`displayKey()`、`descKey()`、`awakeningKey()`、`corrosionKey()`、`passiveKey()`、`texture()`、`byId(String)` |
 | `ego/EgoApi` | 释放判定（服务端）。`check`、`release` 返回 `ReleaseResult` |
-| `client/ego/ClientEgoLoadout` | 5 槽装备状态（客户端本地）。见下 |
+| `ego/EgoResistance` | EGO 状态期间的三系抗性覆盖（`EgoStateListener`，见「EGO 状态」一节） |
+| `client/ClientEgoLoadout` | 5 槽装备状态（客户端本地）。见下 |
 | `client/gui/EgoLoadoutScreen` | 装备界面 |
 | `client/gui/EgoReleaseScreen` | 释放界面 |
 | `net/EgoReleasePacket` | C2S，参数 egoId |
@@ -93,8 +94,12 @@ EgoApi.releaseCorrosion(serverPlayer, ego); // 侵蚀释放：SinApi.consumeAllF
 | `ego/EgoStateCapabilities` + `EgoStateProvider` | capability 挂载（键 `limbusexplore:ego_state`） |
 | `ego/EgoStateListener` | 三段钩子（默认空实现，战斗/表现效果挂这里） |
 | `ego/EgoStateApi` | 服务端状态机（enter/end/tick/isInState/remainingSeconds/registerListener/sync） |
+| `ego/EgoResistance` | 已挂上的监听：进状态把 `Ego.resistanceKind` 那一系抗性覆盖成 `resistanceRate` 倍，结束还原 |
 | `client/ClientEgoState` | 客户端镜像（剩余秒数/当前 EGO/形态） |
 | `net/EgoStateSyncPacket` + `PlayerEgoStateSync` | 每秒同步剩余时间；登录/换维/重生全量同步 |
+
+抗性覆盖走的是 `Resistance` 的**覆盖层**（`setOverride` / `clearOverride`），不动数据包 tag 给的基础值，
+所以不用存旧值、读档也不会把覆盖写死成常驻抗性；HUD 和 Jade 看到的是覆盖之后的实际生效值。
 
 `EgoStateListener` 三个接口：
 
@@ -116,6 +121,29 @@ void   EgoStateApi.end(ServerPlayer);                             // 状态结�
 void   EgoStateApi.registerListener(EgoStateListener);            // 挂三段钩子
 void   EgoStateApi.sync(Player);                                  // 全量同步（PlayerEgoStateSync 自动调）
 ```
+
+## 侵蚀全屏效果（着色器）
+
+`client/CorrosionBannerHud` + `assets/minecraft/shaders/core/corrosion_erosion.{json,vsh,fsh}`。
+两段程序共用一个 shader，靠 `Mode` uniform 切换：`Mode=1` 是释放瞬间的龟裂爆闪（1.4s，淡入 0.7s / 淡出 0.7s），
+`Mode=0` 是 30 秒状态期间的细胞流动 + 边界呼吸。
+
+| uniform | 含义 |
+|---------|------|
+| `Time` | 秒。一瞬间是闪光内经过的时间，持续段是「已过秒数」（30 - 剩余） |
+| `Intensity` | 闪光强度 0~1，持续段恒为 1 |
+| `Mode` | 1 = 一瞬间，0 = 持续 |
+| `Weight` | vec3，三维柏林噪声喂给 R/G/B 的权重，来自 `Ego.noiseR/G/B`（每个 EGO 一套色调） |
+| `SamplerFlash` / `SamplerBar` | 两张底图（`textures/hud/corrosion_flash.png`、`corrosion.png`），单元 0 / 1 |
+
+算法：Worley（Voronoi）F1/F2 边缘距离 + 三维改进柏林噪声，噪声按 `Weight` 分到三个通道。
+
+几个踩过的坑，改动前先看一眼：
+
+- **文件必须在 `assets/minecraft/` 下**：`ShaderInstance` 拼的是 `<命名空间>:shaders/core/<名字>.json`，注册时命名空间写的是 `minecraft`
+- **注册走 `RegisterShadersEvent`**（在 `ClientModEvents`，MOD 总线），不要自己 `new` 了缓存：资源包重载后会换成新的实例
+- **GLSL 里不能对 sampler 用三目运算**（`texture(a ? s1 : s2, uv)` 编译不过），要两张都采样再用 vec3 选
+- shader 建不起来（json 写错之类）会 `LOGGER.error` 然后回退到全屏贴图 blit，不会黑屏
 
 ## 混乱值（Stagger）
 
@@ -177,9 +205,9 @@ boolean SanityApi.isInChaos(Player);      // get() <= Sanity.MIN
 |----|------|
 | `combat/DamageKind` | 三系枚举，附带物品 tag / 攻击者 tag / 伤害类型 tag 的 key |
 | `combat/DamageKindApi` | 判定入口（代码注册 → 数据包 tag → 兜底推断），另有 `heldKind(Player)` |
-| `combat/Resistance` | 三系抗性容器 + 分级常量（FATAL/WEAK/NORMAL/ENDURED/IMMUNE） |
+| `combat/Resistance` | 三系抗性容器 + 分级常量（FATAL/WEAK/NORMAL/ENDURED/IMMUNE）；`get()` 看覆盖层，`getBase()` 看基础值 |
 | `combat/ResistanceCapabilities` + `ResistanceProvider` | capability 挂 LivingEntity（玩家+怪物），含实体 tag 的 `tierTag()` |
-| `combat/ResistanceApi` | `get/set/apply/reset/multiplier/sync`；tag 默认值只在首次查询时套一次 |
+| `combat/ResistanceApi` | `get/set/apply/reset/multiplier/sync` + `setOverride/clearOverride`；tag 默认值只在首次查询时套一次 |
 | `combat/CombatFormula` | 公式骨架：`原伤害 × 抗性 × 等级差修正`（等级差现为 1.0，钩子已留） |
 | `combat/CombatHandler` | `LivingHurtEvent` 唯一入口：判系 → 乘抗性 → 喂混乱值；混乱中改走 ×1.5 |
 | `net/ResistanceSyncPacket` | 玩家抗性同步（UI 用） |
@@ -276,20 +304,56 @@ dependencies { compileOnly fg.deobf("maven.modrinth:jade:11.13.3+forge") }
 外部 mod / 数据包接入时用 tag 而不是改代码，tag 见「三系伤害与抗性」一节；Jade 还有一个它自己的开关界面
 （`limbusexplore:entity_stats`，Jade 的插件配置里能勾掉），效果和 `jadeCompatEnabled` 一样。
 
+## 单元测试
+
+```bash
+gradlew test        # 只跑 src/test/java，不启动游戏，十几秒
+```
+
+测的是**不碰游戏启动的纯逻辑**：数据容器、倍率换算、状态机边界、同步包编解码。
+这些正是出错了也不会崩、只会悄悄算错的地方，靠手测很难发现（写完第一版就抓到两个：
+侵蚀透支的负值读档被清零、抗性存档把临时覆盖写死成基础值）。
+
+| 测试 | 覆盖 |
+|------|------|
+| `sin/SinResourcesTest` | 加减夹 0 / `forceAdd` 允许透支 / 数组顺序 = 枚举顺序 / 存档往返保留负值 |
+| `sanity/SanityTest` | ±45 夹取 / `consume` 不破线 / `consumeForce` 收到 -45 |
+| `chaos/ChaosTest` | 扣到 0 才算破防 / 15 秒倒计时 / 每 40 tick 回 1 / 读档不停在 0 |
+| `ego/EgoStateTest` | 30 秒有效性与剩余秒数向上取整 / 过期存档按无状态处理 |
+| `ego/EgoTest` | 每个等级正好一条 EGO（装备界面按等级摆卡片）/ 抗性倍率在档位范围内 / 资源路径约定 |
+| `combat/ResistanceTest` | 档位常量 / 覆盖层优先、清掉还原 / 存档不把覆盖写死 |
+| `combat/DamageKindTest` | 三系 tag 路径契约（整合包按这个接）/ `byId` 大小写不敏感 |
+| `combat/CombatFormulaTest` | 等级差恒为 1.0（接上等级系统时改这里） |
+| `net/PacketRoundTripTest` | encode → decode → 再 encode 字节一致（漏改 decode、int/float 写错都会挂） |
+
+要碰注册表的测试（比如 `ItemTags` 那条 tag 路径）先调 `TestBootstrap.ensure()`，它会 `Bootstrap.bootStrap()`
+把注册表建起来——不建世界、不开客户端。网络包的 `handle` 不测（要建频道），只测编解码。
+
 ## 架构设计
 
 ### 分层
 
 ```
-data   sin/Sanity/ego 容器+枚举     纯状态，只有 NBT 存取，不 import net/、client/
-api    SinApi/SanityApi/EgoApi/EgoStateApi   业务唯一入口，改完自带同步
-cap    *Capabilities + *Provider    capability 定义与玩家挂载（FORGE 总线）
+data   sin/sanity/ego/chaos/combat 容器+枚举   纯状态，只有 NBT 存取，不 import client/
+api    SinApi/SanityApi/EgoApi/EgoStateApi/ChaosApi/ResistanceApi   业务唯一入口，改完自带同步
+cap    *Capabilities + *Provider    capability 定义与挂载（FORGE 总线）
 net    ModNetworking/包/PlayerDataSync/EgoReleaseService   频道、同步、服务端处理
 client 缓存/界面对话/注册/运行期   只读镜像 + 预检，判定永远在服务端
-command /sins /sanity              调试命令（权限 2）
+compat 第三方 mod 兼容（Jade）   可选依赖，只编译期引用
+command /sins /sanity /chaos /resistance   调试命令（权限 2）
 ```
 
 依赖方向单向：`data ← api ← (command|net 服务端处理)`；`client` 依赖 `ego`/`net` 的包定义，但**服务端逻辑不依赖 client**。
+
+模块之间也要单向，别成环。现在只有这些边：
+
+```
+ego → sin（消耗罪孽）        ego → sanity（消耗理智）      ego → chaos（混乱中禁止释放）
+ego → combat（EGO 覆盖三系抗性）                              combat → chaos（受击喂混乱值）
+```
+
+`EgoResistance` 之所以写在 `ego` 包里而不是 `combat` 包里，就是因为放过去会变成 `combat ↔ ego` 双向依赖。
+新加跨模块调用前先看一眼这几条边，方向不对就换一边放。
 
 ### 约定
 
@@ -300,6 +364,7 @@ command /sins /sanity              调试命令（权限 2）
 4. **总线**：MOD = 注册，FORGE = 运行期；一个监听类只挂一条总线（混了整类注册失败）
 5. **命名**：id/资源文件名一律小写 snake_case；类名 = 模块 + 职责（`SinApi`、`EgoStateProvider`）
 6. **同步包顺序**：`SinType.values()` 就是 `int[7]` 的顺序，别重排；协议破坏性变更 bump `ModNetworking.PROTOCOL`
+7. **动了数据层就补测试**：容器边界、倍率公式、同步包编解码都进 `gradlew test`；「加了字段忘了改 decode」这种错只有往返测试抓得住
 
 ### 新模块模板（照 sin 抄）
 
@@ -321,21 +386,38 @@ src/main/java/com/limbus/limbusexplore/
 ├── config/ModConfig.java           # common.toml 配置
 ├── sin/                            # 罪孽资源：SinType/SinResources/SinApi/Capability
 ├── sanity/                         # 理智值：Sanity/SanityApi/Capability
-├── ego/                            # EGO 定义：RiskLevel/Ego/SinCost/EgoApi
+├── ego/                            # EGO 定义：RiskLevel/Ego/SinCost/EgoApi/EgoResistance
+├── chaos/                          # 混乱值：Chaos/ChaosApi/Capability/监听
+├── combat/                         # 三系伤害与抗性：DamageKind/Resistance/公式/结算入口
+├── compat/jade/                    # Jade 兼容（可选依赖，只编译期引用）
 ├── net/                            # 频道、同步包、同步入口、释放服务
-├── command/                        # 调试命令 /sins、/sanity
+├── command/                        # 调试命令 /sins、/sanity、/chaos、/resistance
 ├── client/
 │   ├── ClientSinResources.java     # 罪孽资源客户端缓存
 │   ├── ClientSanity.java           # 理智值客户端缓存
+│   ├── ClientChaos.java            # 混乱值客户端镜像
+│   ├── ClientResistance.java       # 三系抗性客户端镜像
+│   ├── ClientEntityChaos.java      # 生物混乱状态（头顶标记用）
+│   ├── ClientEgoLoadout.java       # 5 槽装备状态
+│   ├── ClientEgoState.java         # EGO 状态镜像
 │   ├── SinResourcesHud.java        # 左侧资源栏
+│   ├── SanityBarHud.java           # 理智值
+│   ├── ChaosBarHud.java            # 混乱值条
+│   ├── ChaosMarkRenderer.java      # 混乱头顶标记
+│   ├── CorrosionBannerHud.java     # 侵蚀全屏着色器
 │   ├── ClientModEvents.java        # MOD 总线客户端注册
 │   ├── ClientGameEvents.java       # FORGE 总线客户端运行期
 │   ├── EgoReleaseClient.java       # 释放结果展示
-│   ├── ego/                        # ClientEgoLoadout（装备状态）
-│   └── gui/                        # EgoLoadoutScreen / EgoReleaseScreen
+│   └── gui/                        # EgoLoadoutScreen / EgoReleaseScreen / ChaosLockScreen
 └── registry/
     ├── ModItems.java               # 物品注册表
     └── ModCreativeTabs.java        # 创造模式标签
+
+src/test/java/com/limbus/limbusexplore/   # 单元测试（gradlew test，不启动游戏）
+├── TestBootstrap.java              # 需要注册表的测试先调它
+├── sin/ sanity/ chaos/ ego/        # 容器与状态的边界行为
+├── combat/                         # 抗性档位、覆盖层、tag 路径契约
+└── net/PacketRoundTripTest.java    # 同步包编解码往返
 
 src/main/resources/
 ├── META-INF/mods.toml

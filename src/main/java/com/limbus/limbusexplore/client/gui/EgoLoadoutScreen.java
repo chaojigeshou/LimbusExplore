@@ -1,6 +1,6 @@
 package com.limbus.limbusexplore.client.gui;
 
-import com.limbus.limbusexplore.client.ego.ClientEgoLoadout;
+import com.limbus.limbusexplore.client.ClientEgoLoadout;
 import com.limbus.limbusexplore.ego.Ego;
 import com.limbus.limbusexplore.ego.RiskLevel;
 import net.minecraft.client.gui.GuiGraphics;

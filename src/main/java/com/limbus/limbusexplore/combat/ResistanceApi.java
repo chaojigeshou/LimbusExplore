@@ -52,11 +52,31 @@ public final class ResistanceApi {
         sync(entity);
     }
 
+    /** 临时覆盖某一系（比如 EGO 状态期间）：不动基础值，清掉就回原样。 */
+    public static void setOverride(LivingEntity entity, DamageKind kind, float value) {
+        Resistance resistance = of(entity);
+        if (resistance == null) {
+            return;
+        }
+        resistance.setOverride(kind, value);
+        sync(entity);
+    }
+
+    public static void clearOverride(LivingEntity entity) {
+        Resistance resistance = of(entity);
+        if (resistance == null) {
+            return;
+        }
+        resistance.clearOverride();
+        sync(entity);
+    }
+
     public static void reset(LivingEntity entity) {
         Resistance resistance = of(entity);
         if (resistance == null) {
             return;
         }
+        resistance.clearOverride();
         for (DamageKind kind : DamageKind.values()) {
             resistance.set(kind, Resistance.NORMAL);
         }

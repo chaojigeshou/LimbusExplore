@@ -12,7 +12,7 @@ public final class SinApi {
     }
 
     private static SinResources of(Player player) {
-        return player.getCapability(ModCapabilities.SIN_RESOURCES).orElse(null);
+        return player.getCapability(SinCapabilities.SIN_RESOURCES).orElse(null);
     }
 
     public static int get(Player player, SinType type) {

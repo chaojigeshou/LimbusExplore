@@ -141,6 +141,10 @@ dependencies {
     // 没装 Jade 的客户端/服务器也照常跑，插件类由 Jade 自己扫描 @WailaPlugin 才会加载。
     compileOnly fg.deobf("maven.modrinth:jade:11.13.3+forge")
 
+    // 单元测试：只覆盖不碰游戏启动的纯逻辑（数据容器、倍率、公式、编解码）
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly fg.deobf("mezz.jei:jei-${mc_version}-common-api:${jei_version}")
@@ -213,6 +217,13 @@ publishing {
     }
 }
 
+// 单元测试跑在 main 的类路径上（要读 Minecraft 的数据类，比如 CompoundTag），不启动游戏
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    classpath += sourceSets.main.compileClasspath
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+    options.compilerArgs << '-Xlint:deprecation'
 }

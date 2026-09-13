@@ -1,5 +1,6 @@
 package com.limbus.limbusexplore.chaos;
 
+import com.limbus.limbusexplore.config.ModConfig;
 import com.limbus.limbusexplore.net.ChaosSyncPacket;
 import com.limbus.limbusexplore.net.EntityChaosPacket;
 import com.limbus.limbusexplore.net.ModNetworking;
@@ -70,7 +71,7 @@ public final class ChaosApi {
 
     /** 扣混乱值；扣到 0 进入混乱，返回是否进入了混乱。 */
     public static boolean damage(LivingEntity entity, int amount) {
-        if (!com.limbus.limbusexplore.config.ModConfig.CHAOS_ENABLED.get()) {
+        if (!ModConfig.CHAOS_ENABLED.get()) {
             return false;   // 官方绕过入口：关掉混乱系统后挨打不再累计
         }
         Chaos chaos = of(entity);
@@ -87,7 +88,7 @@ public final class ChaosApi {
 
     /** 直接打乱（技能/调试用）。 */
     public static void breakNow(LivingEntity entity) {
-        if (!com.limbus.limbusexplore.config.ModConfig.CHAOS_ENABLED.get()) {
+        if (!ModConfig.CHAOS_ENABLED.get()) {
             return;
         }
         Chaos chaos = of(entity);

@@ -1,4 +1,4 @@
-package com.limbus.limbusexplore.client.ego;
+package com.limbus.limbusexplore.client;
 
 import com.google.gson.Gson;
 import com.limbus.limbusexplore.ego.Ego;

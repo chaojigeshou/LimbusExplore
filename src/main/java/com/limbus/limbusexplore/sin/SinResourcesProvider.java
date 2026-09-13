@@ -15,7 +15,7 @@ public class SinResourcesProvider implements ICapabilitySerializable<CompoundTag
 
     @Override
     public <T> LazyOptional<T> getCapability(Capability<T> capability, @Nullable Direction side) {
-        return capability == ModCapabilities.SIN_RESOURCES ? optional.cast() : LazyOptional.empty();
+        return capability == SinCapabilities.SIN_RESOURCES ? optional.cast() : LazyOptional.empty();
     }
 
     @Override
