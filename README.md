@@ -219,6 +219,28 @@ data/<你的包>/tags/damage_type/damage/slash.json     → 你的伤害类型�
 兼容性约定：只用 `LivingHurtEvent` **乘算**（不替换伤害、不取消事件、不改原版类、不注册自定义伤害类型），
 未知来源一律兜底为打击；`damageKindEnabled` 配置项可整体关闭倍率。
 
+## Jade（玉）兼容
+
+装了 Jade 之后看向生物会多两行信息：
+
+- 常驻：混乱值（低于 1/4 标红、低于 1/2 标黄、满值标绿）；混乱中显示「混乱中 · X 秒」
+- 按住 Shift 详细模式：三系抗性（致命红 / 弱点金 / 普通白 / 耐性蓝 / 免疫灰）
+
+| 文件 | 说明 |
+|------|------|
+| `compat/jade/LimbusJadePlugin` | 入口，`@WailaPlugin(modid)`，注册服务端数据与客户端显示 |
+| `compat/jade/JadeEntityData` | 服务端：读混乱值与三系抗性写进 Jade 数据包（`IServerDataProvider`） |
+| `compat/jade/JadeEntityComponent` | 客户端：读数据画 tooltip（`IEntityComponentProvider`） |
+
+**可选依赖的处理**（关键）：`build.gradle` 里只有编译期依赖
+
+```gradle
+compileOnly fg.deobf(files("libs/Jade-1.20.1-Forge-11.13.3.jar"))
+```
+
+- 没装 Jade 的客户端/服务器照常启动——`compat/jade/` 只有 Jade 自己扫 `@WailaPlugin` 时才会加载
+- 升级 Jade：换掉 `libs/` 里的 jar 并改上面这行路径即可
+
 ## 键位与命令
 
 | 键位 | 功能 |

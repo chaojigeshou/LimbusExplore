@@ -130,6 +130,10 @@ dependencies {
     // then special handling is done to allow a setup of a vanilla dependency without the use of an external repository.
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
+    // Jade（玉）兼容：只编译期引用它的 API，运行时不依赖。
+    // 没装 Jade 的客户端/服务器也照常跑，插件类由 Jade 自己扫描 @WailaPlugin 才会加载。
+    compileOnly fg.deobf(files("libs/Jade-1.20.1-Forge-11.13.3.jar"))
+
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly fg.deobf("mezz.jei:jei-${mc_version}-common-api:${jei_version}")
