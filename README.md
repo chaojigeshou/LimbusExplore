@@ -186,6 +186,17 @@ boolean SanityApi.isInChaos(Player);      // get() <= Sanity.MIN
 | `client/ClientResistance` | 客户端镜像 |
 | `command/ResistanceCommands` | `/resistance get|set|preset`（权限 2） |
 
+**手持物判定表**（其它 mod 可用 tag 或 API 覆盖）：
+
+| 手持 | 判定 |
+|---|---|
+| 空手、任意普通物品 | **打击** |
+| 剑、斧 | **斩击** |
+| 三叉戟、弓、弩 | **突刺** |
+| 镐、锹、锄 | **打击** |
+
+弹射物一律突刺、爆炸一律打击（与手持无关）；怪物优先看它的实体 tag / API 配置，没配才按手持物算。
+
 **其他 mod 怎么接**（都不需要写代码，加数据包 json 即可）：
 
 ```
