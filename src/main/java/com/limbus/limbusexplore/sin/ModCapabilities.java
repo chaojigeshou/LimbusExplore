@@ -12,7 +12,7 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-// capability 定义 + 挂到玩家身上。网络同步不在这里，去 net/PlayerSinSync。
+// capability 定义 + 挂到玩家身上。网络同步不在这里，去 net/PlayerDataSync。
 @Mod.EventBusSubscriber(modid = LimbusExplore.MODID)
 public final class ModCapabilities {
 

@@ -296,6 +296,7 @@ command /sins /sanity              调试命令（权限 2）
 1. **服务端权威**：判定与扣减全在服务端；客户端只有 `Client*` 镜像和预检（`canPay` 类），预检失败直接提示、不发包
 2. **数据修改必须走 Api**：业务代码不得直接摸 capability、网络包、容器字段；Api 内部保证改完同步
 3. **注册集中一处**：网络包全部在 `ModNetworking.register()`；客户端注册全部在 `ClientModEvents`（MOD 总线）；运行期逻辑全部在 `ClientGameEvents`（FORGE 总线）；玩家数据同步监听全部在 `net/PlayerDataSync`
+   - 例外：每个模块的 `*Capabilities` 自己 `@Mod.EventBusSubscriber` 挂载能力（缺省 FORGE 总线），删模块时连它一起删就行
 4. **总线**：MOD = 注册，FORGE = 运行期；一个监听类只挂一条总线（混了整类注册失败）
 5. **命名**：id/资源文件名一律小写 snake_case；类名 = 模块 + 职责（`SinApi`、`EgoStateProvider`）
 6. **同步包顺序**：`SinType.values()` 就是 `int[7]` 的顺序，别重排；协议破坏性变更 bump `ModNetworking.PROTOCOL`
