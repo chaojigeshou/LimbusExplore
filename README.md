@@ -224,7 +224,9 @@ data/<你的包>/tags/damage_type/damage/slash.json     → 你的伤害类型�
 装了 Jade 之后看向生物会多两行信息：
 
 - 常驻：混乱值（低于 1/4 标红、低于 1/2 标黄、满值标绿）；混乱中显示「混乱中 · X 秒」
-- 按住 Shift 详细模式：三系抗性（致命红 / 弱点金 / 普通白 / 耐性蓝 / 免疫灰）
+- 按住 Shift 详细模式：三系抗性，每系一行 `[图标] ×倍率`——图标是美工资源里那三张（`textures/hud/damage_{slash,pierce,blunt}.png`），倍率按档位配色（致命红 / 弱点金 / 普通白 / 耐性蓝 / 免疫灰）
+
+图标走 Jade 的自定义元素（`Element` 基类，只实现 `render` + `getSize`），直接 `GuiGraphics.blit` 我们自己的贴图，不需要注册到方块图集。
 
 | 文件 | 说明 |
 |------|------|
