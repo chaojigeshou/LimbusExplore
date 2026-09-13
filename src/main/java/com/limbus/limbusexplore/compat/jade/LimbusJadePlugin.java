@@ -24,5 +24,7 @@ public class LimbusJadePlugin implements IWailaPlugin {
     @Override
     public void registerClient(IWailaClientRegistration registration) {
         registration.registerEntityComponent(new JadeEntityComponent(), LivingEntity.class);
+        // 官方绕过入口：Jade 设置界面里会出现这个开关，玩家不想看可以自己关
+        registration.addConfig(JadeEntityData.UID, true);
     }
 }

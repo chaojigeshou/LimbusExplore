@@ -31,7 +31,11 @@ Limbus Explore 更新日志
 - 新增 Jade（玉）兼容：看向生物会多显示混乱值，按住 Shift 还能看到三系抗性（斩击 / 突刺 / 打击图标 + 倍率，颜色按档位来）
   - Jade 是可选依赖，没装 Jade 也照常跑（编译期才引用它的接口）
 - 新增 调试命令：/chaos、/resistance（/sins、/sanity 早就有）
-- 新增 配置项 damageKindEnabled，服主可以整体关掉本 mod 的伤害倍率
+- 新增 官方绕过入口（都在 config/limbusexplore-common.toml 里，整合包按需关）
+  - damageKindEnabled：关掉本 mod 的伤害倍率（三系抗性不再参与结算），混乱值照样累计
+  - chaosEnabled：关掉混乱系统，挨打不扣混乱值、不进混乱状态
+  - chaosMarkEnabled：纯客户端开关，不画生物头顶那张混乱标记
+  - jadeCompatEnabled：不往 Jade 送数据；Jade 那边也有自己的开关，两处任关一处即生效
 - 修复 侵蚀着色器贴图采样写法：GLSL 不允许 sampler 走三目运算，改成两张图都采样再选
 - 修复 着色器资源路径：ShaderInstance 只认 minecraft 命名空间，文件挪到 assets/minecraft/shaders/core
 - 修复 侵蚀一瞬间闪光的播放条件，不再依赖状态包的到达顺序

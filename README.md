@@ -254,9 +254,27 @@ dependencies { compileOnly fg.deobf("maven.modrinth:jade:11.13.3+forge") }
 | R | 释放界面 |
 
 ```text
-/sins list | add <sin> <n> | set <sin> <n> | clear       （权限 2）
-/sanity get | add <n> | set <n> | reset                    （权限 2）
+/sins list | add <sin> <n> | set <sin> <n> | clear        （权限 2）
+/sanity get | add <n> | set <n> | reset                     （权限 2）
+/chaos get | set <n> | damage <n> | break | reset           （权限 2）
+/resistance get | set <kind> <tier> | preset <name>         （权限 2）
 ```
+
+## 配置与绕过入口
+
+`config/limbusexplore-common.toml`（改动后 `/reload` 或重启生效）。这些开关就是官方绕过入口：整合包不想要哪块机制就关哪块，
+关掉之后本 mod 对应部分不生效，也不影响别的 mod。
+
+| 配置项 | 默认 | 关掉之后 |
+|--------|------|----------|
+| `logStartup` | true | 启动时不再打印 mod 加载日志 |
+| `damageKindEnabled` | true | 本 mod 不再参与伤害数值（三系抗性不生效）；混乱值仍然累计 |
+| `chaosEnabled` | true | 挨打不再扣混乱值、不触发混乱状态；已在混乱中的会正常结束 |
+| `chaosMarkEnabled` | true | 客户端不画混乱头顶标记（纯显示开关，服务端行为不变） |
+| `jadeCompatEnabled` | true | 不往 Jade 送数据，Jade 上看不到本 mod 的任何信息 |
+
+外部 mod / 数据包接入时用 tag 而不是改代码，tag 见「三系伤害与抗性」一节；Jade 还有一个它自己的开关界面
+（`limbusexplore:entity_stats`，Jade 的插件配置里能勾掉），效果和 `jadeCompatEnabled` 一样。
 
 ## 架构设计
 

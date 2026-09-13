@@ -40,6 +40,10 @@ public final class ChaosMarkRenderer {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
             return;
         }
+        // 官方绕过入口：客户端配置里能关掉这张图
+        if (!com.limbus.limbusexplore.config.ModConfig.CHAOS_MARK_ENABLED.get()) {
+            return;
+        }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) {
             return;

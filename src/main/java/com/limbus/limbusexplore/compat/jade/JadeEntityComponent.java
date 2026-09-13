@@ -29,6 +29,10 @@ public class JadeEntityComponent implements IEntityComponentProvider {
 
     @Override
     public void appendTooltip(ITooltip tooltip, EntityAccessor accessor, IPluginConfig config) {
+        // 官方绕过入口：Jade 自己的设置界面里能关掉这一项
+        if (!config.get(JadeEntityData.UID)) {
+            return;
+        }
         CompoundTag data = accessor.getServerData();
         if (!data.contains("chaos")) {
             return;

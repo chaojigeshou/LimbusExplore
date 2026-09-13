@@ -19,6 +19,10 @@ public class JadeEntityData implements IServerDataProvider<EntityAccessor> {
 
     @Override
     public void appendServerData(CompoundTag data, EntityAccessor accessor) {
+        // 服务端侧的官方绕过入口：关掉后不再往 Jade 塞数据
+        if (!com.limbus.limbusexplore.config.ModConfig.JADE_COMPAT_ENABLED.get()) {
+            return;
+        }
         Entity entity = accessor.getEntity();
         if (!(entity instanceof LivingEntity living)) {
             return;
