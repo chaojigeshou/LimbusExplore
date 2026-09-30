@@ -21,6 +21,10 @@ sourceSets {
         compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
         runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
     }
+    uiPreview {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
 }
 
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
@@ -92,6 +96,15 @@ minecraft {
         client {
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
             property 'forge.enabledGameTestNamespaces', mod_id
+            if (project.hasProperty('egoUiPreview')) {
+                workingDirectory project.file('build/ui-preview')
+                property 'limbusexplore.uiPreview', 'true'
+                property 'limbusexplore.uiPreviewOutput', project.findProperty('egoUiPreviewOutput') ?: project.file('build/ui-preview/screenshots').absolutePath
+                property 'forge.logging.console.level', 'info'
+                mods {
+                    "${mod_id}" { source sourceSets.uiPreview }
+                }
+            }
         }
 
         server {
@@ -257,5 +270,11 @@ tasks.matching { it.name == 'runGameTestServer' }.configureEach {
         if (summary == null || !summary.find() || summary.group(1).toInteger() == 0) {
             throw new GradleException('No GameTests ran; check template namespace and test source registration.')
         }
+    }
+}
+
+if (project.hasProperty('egoUiPreview')) {
+    tasks.matching { it.name == 'runClient' }.configureEach {
+        dependsOn tasks.named('uiPreviewClasses')
     }
 }

@@ -1,0 +1,9 @@
+{
+  "sources": [
+    {
+      "type": "minecraft:single",
+      "resource": "limbusexplore:hud/sin_wrath",
+      "sprite": "limbusexplore:hud/sin_wrath"
+    }
+  ]
+}

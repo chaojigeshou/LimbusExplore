@@ -1,297 +1,240 @@
 package com.limbus.limbusexplore.client.gui;
 
+import com.limbus.limbusexplore.client.ClientChaos;
+import com.limbus.limbusexplore.client.ClientEgoLoadout;
 import com.limbus.limbusexplore.client.ClientEgoState;
 import com.limbus.limbusexplore.client.ClientSanity;
 import com.limbus.limbusexplore.client.ClientSinResources;
-import com.limbus.limbusexplore.client.ClientEgoLoadout;
 import com.limbus.limbusexplore.ego.Ego;
 import com.limbus.limbusexplore.ego.SinCost;
 import com.limbus.limbusexplore.net.EgoReleasePacket;
 import com.limbus.limbusexplore.net.ModNetworking;
 import com.limbus.limbusexplore.sanity.Sanity;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.glfw.GLFW;
 
-// R 键打开。已装备的 EGO 竖排卡片（Z 最左 A 最右，空槽跳过）。
-// 短按（<500ms）= 释放当前形态；长按（>=500ms）= 切成侵蚀态（卡片变红、左侧进度条从底到顶、轻微抖动）；
-// 再短按释放的就是侵蚀版；右键取消侵蚀态。R/ESC 关闭。
-// 注意：卡片序号是「可见顺序」，槽位号是 0..4，两者别搞混（setCorroded 要槽位号）。
+import java.util.Arrays;
+
+import static com.limbus.limbusexplore.client.gui.EgoUiPainter.*;
+
+/** R 键释放界面：工业档案卡。外观与布局可替换，仍只向服务端发送既有释放请求。 */
 public class EgoReleaseScreen extends Screen {
-
-    private static final int ITEM_W = 150;
-    private static final int ITEM_H = 172;
-    private static final int ITEM_GAP = 12;
-    private static final long LONG_PRESS_MS = 500;
-
-    private int pressSlot = -1;
-    private long pressStart;
+    private final EgoReleaseGesture gesture = new EgoReleaseGesture();
+    private EgoReleaseLayout layout;
+    private EgoCardRenderer renderer;
+    private Ego pressedEgo;
+    private Ego detailsEgo;
     private int page;
+    private int selectedSlot = -1;
 
     public EgoReleaseScreen() {
         super(Component.translatable("screen.limbusexplore.ego_release"));
     }
 
-    private int pageSize() {
-        return Math.max(1, (width - 16 + ITEM_GAP) / (ITEM_W + ITEM_GAP));
-    }
-
-    private int pageCount() {
-        return Math.max(1, (ClientEgoLoadout.equippedList().length + pageSize() - 1) / pageSize());
+    @Override
+    protected void init() {
+        layout = new EgoReleaseLayout(width, height);
+        renderer = new EgoCardRenderer(font);
+        gesture.cancel();
     }
 
     private Ego[] visibleEgos() {
-        Ego[] equipped = ClientEgoLoadout.equippedList();
-        page = Math.min(page, pageCount() - 1);
-        int start = page * pageSize();
-        return java.util.Arrays.copyOfRange(equipped, start, Math.min(equipped.length, start + pageSize()));
+        Ego[] all = ClientEgoLoadout.equippedList();
+        page = Math.max(0, Math.min(page, layout.pageCount(all.length) - 1));
+        int from = page * layout.capacity();
+        return Arrays.copyOfRange(all, from, Math.min(all.length, from + layout.capacity()));
     }
 
-    private static int cardY(int screenHeight) {
-        return screenHeight / 2 - ITEM_H / 2 - 12;
-    }
-
-    // visibleIndex：该槽在可见序列里的第几张
-    private static int cardX(int visibleIndex, int count, int screenWidth) {
-        int total = count * ITEM_W + (count - 1) * ITEM_GAP;
-        return screenWidth / 2 - total / 2 + visibleIndex * (ITEM_W + ITEM_GAP);
-    }
-
-    /** 命中哪张卡，返回槽位号；没点中返回 -1。 */
-    private int slotAt(double mouseX, double mouseY) {
-        int count = visibleEgos().length;
-        int y = cardY(height);
-        int visible = 0;
-        for (Ego ego : visibleEgos()) {
-            int slot = ego.level.ordinal();
-            int x = cardX(visible, count, width);
-            if (mouseX >= x && mouseX < x + ITEM_W && mouseY >= y && mouseY < y + ITEM_H) {
-                return slot;
-            }
-            visible++;
+    private int indexAt(double x, double y, Ego[] visible) {
+        for (int i = 0; i < visible.length; i++) {
+            if (layout.card(i, visible.length).contains(x, y)) return i;
         }
         return -1;
     }
 
-    // 正式图没放之前回退罪孽图标。结果缓存起来：渲染每帧都画，别再每帧查资源包
-    // （注意：F3+T 热重载资源包后新图要重进游戏才生效）
-    private static final java.util.Map<String, ResourceLocation> TEXTURES = new java.util.HashMap<>();
-
-    private static ResourceLocation textureOf(Minecraft minecraft, Ego ego) {
-        return TEXTURES.computeIfAbsent(ego.id, id -> {
-            ResourceLocation texture = ego.texture();
-            return minecraft.getResourceManager().getResource(texture).isEmpty() ? ego.sin.texture() : texture;
-        });
-    }
-
-    // 预检：状态、资源、理智。缺哪个提示哪个（服务端还会判一次，这里省去往返）
-    private static boolean checkRelease(Minecraft minecraft, Ego ego, boolean corroded) {
-        if (ClientEgoState.isInState()) {
-            minecraft.player.displayClientMessage(
-                    Component.translatable("ego.limbusexplore.in_ego_state"), true);
-            return false;
-        }
-        if (corroded) {
-            // 侵蚀态不查资源（透支），理智也不查下限
-            return true;
-        }
-        for (SinCost cost : ego.costs()) {
-            int have = ClientSinResources.get(cost.sin());
-            if (have < cost.amount()) {
-                minecraft.player.displayClientMessage(
-                        Component.translatable("ego.limbusexplore.resource_lack",
-                                Component.translatable(cost.sin().displayKey()), cost.amount(), have), true);
-                return false;
-            }
-        }
-        int have = ClientSanity.get();
-        if (have - ego.sanityCost >= Sanity.MIN) {
-            return true;
-        }
-        minecraft.player.displayClientMessage(
-                Component.translatable("ego.limbusexplore.sanity_lack", ego.sanityCost, have), true);
-        return false;
+    private int slotAt(double x, double y) {
+        Ego[] visible = visibleEgos();
+        int index = indexAt(x, y, visible);
+        return index < 0 ? -1 : visible[index].level.ordinal();
     }
 
     @Override
+    @SuppressWarnings("deprecation") // 1.20.1 的批处理入口；避免圆环/铆钉的每个像素单独 flush。
     public void render(GuiGraphics gui, int mouseX, int mouseY, float partialTick) {
         renderBackground(gui);
+        gui.drawManaged(() -> renderArchive(gui, mouseX, mouseY));
+    }
 
-        Minecraft minecraft = Minecraft.getInstance();
-        gui.drawCenteredString(font, title, width / 2, cardY(height) - 22, 0xFFFFFF);
-
+    private void renderArchive(GuiGraphics gui, int mouseX, int mouseY) {
+        gui.fill(0, 0, width, height, 0xC0000000);
+        gui.fillGradient(0, 0, width, height / 2, 0xDD000000, 0x08000000);
+        gui.fillGradient(0, height * 2 / 3, width, height, 0x08000000, 0xEC000000);
+        double mx = layout.logical(mouseX), my = layout.logical(mouseY);
         Ego[] visible = visibleEgos();
+        int hover = indexAt(mx, my, visible);
+        if (detailsEgo == null && hover >= 0) selectedSlot = visible[hover].level.ordinal();
+        if (visible.length > 0 && Arrays.stream(visible).noneMatch(ego -> ego.level.ordinal() == selectedSlot)) {
+            selectedSlot = visible[0].level.ordinal();
+        }
+
+        // 切换装备或打开详情后，旧的按下动作不能误释放新的同等级条目。
+        if (gesture.slot() >= 0 && ClientEgoLoadout.get(gesture.slot()) != pressedEgo) gesture.cancel();
+        int held = detailsEgo == null ? gesture.poll(Util.getMillis(), slotAt(mx, my)) : -1;
+        if (held >= 0) ClientEgoLoadout.setCorroded(held, true);
+
+        gui.pose().pushPose();
+        gui.pose().scale(layout.scale(), layout.scale(), 1);
+        int vw = layout.viewWidth();
+        text(gui, font, Component.literal("E.G.O  /  RELEASE ARCHIVE"), 14, 12, BRASS.light(), 0.7f);
+        text(gui, font, EgoCardRenderer.label("header"), 14, 25, MUTED, 0.63f);
+        Component sanity = EgoCardRenderer.label("sanity", ClientSanity.get());
+        text(gui, font, sanity, vw - Math.round(font.width(sanity) * 0.7f) - 14, 14,
+                ClientSanity.get() < 0 ? RED : PAPER, 0.7f);
+        gui.fill(14, 35, vw - 14, 36, 0x804B3019);
+
+        // 细弧线只作侵蚀状态的背景呼应，不盖住卡面或加入新战斗机制。
+        for (int i = 0; i < visible.length; i++) {
+            if (ClientEgoLoadout.isCorroded(visible[i].level.ordinal())) {
+                int cx = layout.card(i, visible.length).x() + 66;
+                arc(gui, cx - 32, 135, 111, Math.PI * 1.08, Math.PI * 1.87, 0x7047140F);
+            }
+        }
+
         if (visible.length == 0) {
-            gui.drawCenteredString(font, Component.translatable("screen.limbusexplore.ego_empty"),
-                    width / 2, height / 2, 0xFF909090);
-            return;
+            centered(gui, font, Component.translatable("screen.limbusexplore.ego_empty"),
+                    vw / 2, 158, PAPER, 1f);
+            centered(gui, font, EgoCardRenderer.label("equip_first"), vw / 2, 179, MUTED, 0.85f);
+        } else {
+            for (int i = 0; i < visible.length; i++) {
+                int slot = visible[i].level.ordinal();
+                renderer.card(gui, layout.card(i, visible.length), visible[i], slot == selectedSlot,
+                        detailsEgo == null && layout.info(i, visible.length).contains(mx, my),
+                        gesture.slot() == slot ? gesture.progress(Util.getMillis()) : 0);
+            }
+            renderer.footer(gui, layout, ClientEgoLoadout.get(selectedSlot));
         }
-
-        int y0 = cardY(height);
-        // 长按反馈只在「普通 → 侵蚀」的切换过程里出现；已经侵蚀态的槽位不再显示
-        boolean pressing = pressSlot >= 0
-                && System.currentTimeMillis() - pressStart < LONG_PRESS_MS
-                && !ClientEgoLoadout.isCorroded(pressSlot);
-
-        // 按住满 500ms 的瞬间就切侵蚀态，不用等松开
-        if (pressSlot >= 0 && !ClientEgoLoadout.isCorroded(pressSlot)
-                && System.currentTimeMillis() - pressStart >= LONG_PRESS_MS) {
-            ClientEgoLoadout.setCorroded(pressSlot, true);
-            pressSlot = -1; // 已经切好了，等会儿松开不需要再做任何事
+        renderer.resources(gui, layout);
+        int pages = layout.pageCount(ClientEgoLoadout.equippedList().length);
+        if (pages > 1) {
+            pageButton(gui, layout.previousPage(), "‹", page > 0, mx, my);
+            pageButton(gui, layout.nextPage(), "›", page + 1 < pages, mx, my);
+            centered(gui, font, Component.literal((page + 1) + " / " + pages), vw / 2, 339, PAPER, 0.8f);
         }
-        int visibleIndex = 0;
-        for (Ego ego : visible) {
-            int slot = ego.level.ordinal();
-            int x = cardX(visibleIndex, visible.length, width);
-            int y = y0;
-            visibleIndex++;
-
-            // 长按中的卡片轻微抖动（只晃视觉，命中判定仍用原坐标）
-            if (slot == pressSlot && pressing) {
-                x += (int) (Math.random() * 3) - 1;
-                y += (int) (Math.random() * 3) - 1;
-            }
-
-            boolean corroded = ClientEgoLoadout.isCorroded(slot);
-            boolean fits = ClientSinResources.canPayClient(ego.costs());
-            boolean sanityFits = ClientSanity.get() - ego.sanityCost >= Sanity.MIN;
-            boolean hover = mouseX >= x && mouseX < x + ITEM_W && mouseY >= y && mouseY < y + ITEM_H;
-
-            // 卡片底 + 顶条：侵蚀态整体偏红
-            gui.fill(x, y, x + ITEM_W, y + ITEM_H,
-                    corroded ? (hover ? 0xF05A2A2A : 0xF0441F1F) : (hover ? 0xF03A3A3A : 0xF0282828));
-            gui.fill(x, y, x + ITEM_W, y + 2, corroded ? 0xFFE04B4B : ego.level.color);
-
-            int textColor = corroded ? 0xFFFF9E9E : (fits ? 0xFFFFFF : 0xFF909090);
-
-            // 图片（居中）+ 名称 + 等级
-            gui.blit(textureOf(minecraft, ego), x + (ITEM_W - 48) / 2, y + 10, 0, 0, 48, 48, 48, 48);
-            gui.drawCenteredString(font, minecraft.font.plainSubstrByWidth(
-                    Component.translatable(ego.displayKey()).getString(), ITEM_W - 12), x + ITEM_W / 2, y + 62, textColor);
-            gui.drawCenteredString(font, Component.translatable(ego.level.displayKey()),
-                    x + ITEM_W / 2, y + 76, ego.level.color);
-
-            // 介绍（两行截断）
-            String desc = Component.translatable(ego.descKey()).getString();
-            String line1 = minecraft.font.plainSubstrByWidth(desc, ITEM_W - 12);
-            String line2 = desc.length() > line1.length()
-                    ? minecraft.font.plainSubstrByWidth(desc.substring(line1.length()), ITEM_W - 12) : "";
-            gui.drawString(font, line1, x + (ITEM_W - font.width(line1)) / 2, y + 92, 0xFFBBBBBB, false);
-            if (!line2.isEmpty()) {
-                gui.drawString(font, line2, x + (ITEM_W - font.width(line2)) / 2, y + 104, 0xFFBBBBBB, false);
-            }
-
-            // 所需资源（组合，每个一行）；侵蚀态按 1.5 倍向上取整显示
-            int costY = y + 122;
-            for (SinCost cost : ego.costs()) {
-                int amount = corroded ? (cost.amount() * 3 + 1) / 2 : cost.amount();
-                gui.blit(cost.sin().texture(), x + 18, costY, 0, 0, 14, 14, 16, 16);
-                String label = Component.translatable(cost.sin().displayKey()).getString() + " ×" + amount;
-                boolean enough = !corroded && minecraft.player != null
-                        && ClientSinResources.get(cost.sin()) >= cost.amount();
-                gui.drawString(font, label, x + 35, costY + 1, enough ? 0xFFD8D8D8 : 0xFFE04B4B, false);
-                costY += 15;
-            }
-
-            // 理智消耗（侵蚀态 1.5 倍 + 允许扣穿），不够红
-            int sanityCost = corroded ? (ego.sanityCost * 3 + 1) / 2 : ego.sanityCost;
-            gui.drawCenteredString(font, Component.translatable("screen.limbusexplore.sanity_cost", sanityCost), x + ITEM_W / 2, costY + 2,
-                    (corroded || sanityFits) ? 0xFF9FD8FF : 0xFFE04B4B);
-
-            // 侵蚀态角标
-            if (corroded) {
-                gui.drawString(font, Component.translatable("screen.limbusexplore.corrosion"), x + ITEM_W - 36, y + 4, 0xFFE04B4B, false);
-            }
-
-            // 长按进度：从底部往上铺满整张卡片，红色半透明
-            if (slot == pressSlot && pressing) {
-                float progress = (System.currentTimeMillis() - pressStart) / (float) LONG_PRESS_MS;
-                int barH = (int) (progress * ITEM_H);
-                gui.fill(x, y + ITEM_H - barH, x + ITEM_W, y + ITEM_H, 0x99E04B4B);
-            }
+        Component hint = EgoCardRenderer.label("controls");
+        centered(gui, font, hint, vw / 2, pages > 1 ? 354 : 343, MUTED,
+                Math.min(0.64f, (vw - 20) / (float) Math.max(1, font.width(hint))));
+        if (detailsEgo != null) {
+            gui.flush(); // 弹窗遮罩必须在下层卡牌/文字已经提交之后绘制。
+            renderer.details(gui, layout, detailsEgo);
         }
+        gui.pose().popPose();
+    }
 
-        gui.drawCenteredString(font, Component.translatable("screen.limbusexplore.ego_release_hint"),
-                width / 2, y0 + ITEM_H + 8, 0xFFAAAAAA);
-        if (pageCount() > 1) gui.drawCenteredString(font,
-                Component.translatable("screen.limbusexplore.ego_page", page + 1, pageCount()),
-                width / 2, y0 + ITEM_H + 21, 0xFFAAAAAA);
+    private void pageButton(GuiGraphics gui, EgoReleaseLayout.Box box, String caption, boolean enabled, double mx, double my) {
+        bevel(gui, box.x(), box.y(), box.w(), box.h(), 2,
+                enabled && box.contains(mx, my) ? BRASS.face() : BRASS.soft());
+        centered(gui, font, Component.literal(caption), box.x() + box.w() / 2, box.y() + 3,
+                enabled ? PAPER : MUTED, 1f);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int slot = slotAt(mouseX, mouseY);
-        if (slot < 0) {
-            pressSlot = -1;
-            return super.mouseClicked(mouseX, mouseY, button);
+        double x = layout.logical(mouseX), y = layout.logical(mouseY);
+        if (detailsEgo != null) {
+            if (button == 0 && (layout.closeDetails().contains(x, y) || !layout.details().contains(x, y))) {
+                detailsEgo = null;
+            }
+            return true; // 详情窗不会把点击传给下层卡牌。
         }
-
-        if (button == 1) {
-            // 右键：取消侵蚀态
-            ClientEgoLoadout.setCorroded(slot, false);
-            return true;
+        if (button == 0 && layout.pageCount(ClientEgoLoadout.equippedList().length) > 1) {
+            if (layout.previousPage().contains(x, y)) { changePage(-1); return true; }
+            if (layout.nextPage().contains(x, y)) { changePage(1); return true; }
         }
-        if (button == 0) {
-            pressSlot = slot;
-            pressStart = System.currentTimeMillis();
-            return true;
+        Ego[] visible = visibleEgos();
+        int index = indexAt(x, y, visible);
+        gesture.cancel();
+        if (index < 0) return super.mouseClicked(mouseX, mouseY, button);
+        Ego ego = visible[index];
+        selectedSlot = ego.level.ordinal();
+        if (button == 0 && layout.info(index, visible.length).contains(x, y)) {
+            detailsEgo = ego;
+        } else if (button == 1) {
+            ClientEgoLoadout.setCorroded(selectedSlot, false);
+        } else if (button == 0) {
+            pressedEgo = ego;
+            gesture.press(selectedSlot, Util.getMillis());
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return true;
     }
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        int slot = pressSlot;
-        pressSlot = -1;
-        if (button != 0 || slot < 0 || slot != slotAt(mouseX, mouseY)) {
-            return super.mouseReleased(mouseX, mouseY, button);
-        }
-
-        long duration = System.currentTimeMillis() - pressStart;
-        if (duration >= LONG_PRESS_MS) {
-            // 长按：切成侵蚀态（已侵蚀则保持，不重复）
-            if (!ClientEgoLoadout.isCorroded(slot)) {
-                ClientEgoLoadout.setCorroded(slot, true);
-            }
-            return true;
-        }
-
-        // 短按：按当前形态释放，发完包自动关界面
-        Ego ego = ClientEgoLoadout.get(slot);
-        if (ego != null) {
+        if (button != 0 || detailsEgo != null) return true;
+        int slot = gesture.slot();
+        Ego current = ClientEgoLoadout.get(slot);
+        EgoReleaseGesture.Action action = gesture.release(slotAt(layout.logical(mouseX), layout.logical(mouseY)), Util.getMillis());
+        if (current == null || current != pressedEgo) return true;
+        if (action == EgoReleaseGesture.Action.CORRODE) ClientEgoLoadout.setCorroded(slot, true);
+        if (action == EgoReleaseGesture.Action.RELEASE) {
             boolean corroded = ClientEgoLoadout.isCorroded(slot);
-            if (checkRelease(Minecraft.getInstance(), ego, corroded)) {
-                ModNetworking.sendToServer(new EgoReleasePacket(ego.id, corroded));
+            if (checkRelease(current, corroded)) {
+                ModNetworking.sendToServer(new EgoReleasePacket(current.id, corroded));
                 onClose();
             }
         }
         return true;
     }
 
+    private boolean checkRelease(Ego ego, boolean corroded) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.getConnection() == null) return false;
+        Component error = null;
+        if (ClientChaos.isInChaos()) error = Component.translatable("ego.limbusexplore.in_chaos");
+        else if (ClientEgoState.isInState()) error = Component.translatable("ego.limbusexplore.in_ego_state");
+        else if (!corroded) {
+            for (SinCost entry : ego.costs()) {
+                if (ClientSinResources.get(entry.sin()) < entry.amount()) {
+                    error = Component.translatable("ego.limbusexplore.resource_lack",
+                            Component.translatable(entry.sin().displayKey()), entry.amount(), ClientSinResources.get(entry.sin()));
+                    break;
+                }
+            }
+            if (error == null && (long) ClientSanity.get() - ego.sanityCost < Sanity.MIN) {
+                error = Component.translatable("ego.limbusexplore.sanity_lack", ego.sanityCost, ClientSanity.get());
+            }
+        }
+        if (error != null) mc.player.displayClientMessage(error, true);
+        return error == null;
+    }
+
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (detailsEgo != null) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE || keyCode == GLFW.GLFW_KEY_R) detailsEgo = null;
+            return true;
+        }
         if (keyCode == GLFW.GLFW_KEY_LEFT || keyCode == GLFW.GLFW_KEY_RIGHT) {
             changePage(keyCode == GLFW.GLFW_KEY_RIGHT ? 1 : -1);
             return true;
         }
-        if (keyCode == GLFW.GLFW_KEY_R) {
-            onClose();
-            return true;
-        }
+        if (keyCode == GLFW.GLFW_KEY_R) { onClose(); return true; }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private void changePage(int delta) {
-        page = Math.max(0, Math.min(pageCount() - 1, page + delta));
-        pressSlot = -1;
+        gesture.cancel();
+        page = Math.max(0, Math.min(layout.pageCount(ClientEgoLoadout.equippedList().length) - 1, page + delta));
+        Ego[] visible = visibleEgos();
+        selectedSlot = visible.length == 0 ? -1 : visible[0].level.ordinal();
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        changePage(delta < 0 ? 1 : -1);
+        if (detailsEgo == null && delta != 0) changePage(delta < 0 ? 1 : -1);
         return true;
     }
 }
