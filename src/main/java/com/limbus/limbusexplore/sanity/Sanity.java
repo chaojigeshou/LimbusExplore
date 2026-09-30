@@ -15,7 +15,7 @@ public final class Sanity {
     }
 
     public void add(int amount) {
-        set(value + amount);
+        value = (int) Math.max(MIN, Math.min(MAX, (long) value + amount));
     }
 
     public void set(int value) {
@@ -28,7 +28,7 @@ public final class Sanity {
 
     // 扣完能不能待在合法范围里（不跌破 MIN）
     public boolean canConsume(int amount) {
-        return value - amount >= MIN;
+        return amount >= 0 && (long) value - amount >= MIN;
     }
 
     public boolean consume(int amount) {
@@ -41,7 +41,8 @@ public final class Sanity {
 
     /** 不查下限直接扣，扣完收缩到 MIN（侵蚀释放用）。 */
     public void consumeForce(int amount) {
-        value = Math.max(MIN, value - amount);
+        if (amount < 0) throw new IllegalArgumentException("Negative sanity cost");
+        value = (int) Math.max(MIN, (long) value - amount);
     }
 
     public void copyFrom(Sanity other) {
@@ -55,6 +56,6 @@ public final class Sanity {
     }
 
     public void load(CompoundTag tag) {
-        value = tag.getInt("value");
+        set(tag.getInt("value"));
     }
 }

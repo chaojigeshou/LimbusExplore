@@ -51,7 +51,8 @@ class ResistanceTest {
         loaded.load(resistance.save());
 
         assertEquals(Resistance.WEAK, loaded.getBase(DamageKind.PIERCE));
-        assertEquals(Resistance.IMMUNE, loaded.get(DamageKind.PIERCE));
+        assertEquals(Resistance.WEAK, loaded.get(DamageKind.PIERCE));
+        assertFalse(loaded.hasOverride());
         assertTrue(loaded.isTagged());
     }
 
@@ -87,5 +88,16 @@ class ResistanceTest {
         assertEquals(1.0f, Resistance.NORMAL);
         assertEquals(0.5f, Resistance.ENDURED);
         assertEquals(0.0f, Resistance.IMMUNE);
+    }
+
+    @Test void legacySavedOverrideIsNotResurrected() {
+        CompoundTag old = new CompoundTag();
+        old.putFloat("blunt", 1f);
+        old.putFloat("override_blunt", 0f);
+        Resistance loaded = new Resistance();
+        loaded.setOverride(DamageKind.SLASH, 2);
+        loaded.load(old);
+        assertFalse(loaded.hasOverride());
+        assertEquals(1f, loaded.get(DamageKind.BLUNT));
     }
 }

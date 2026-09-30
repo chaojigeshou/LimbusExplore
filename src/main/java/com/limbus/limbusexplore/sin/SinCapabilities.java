@@ -8,7 +8,6 @@ import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.CapabilityManager;
 import net.minecraftforge.common.capabilities.CapabilityToken;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -30,11 +29,4 @@ public final class SinCapabilities {
         }
     }
 
-    // 死亡重生的新实体会克隆一份旧数据，不然换个身体资源就清零了
-    @SubscribeEvent
-    public static void onPlayerClone(PlayerEvent.Clone event) {
-        event.getEntity().getCapability(SIN_RESOURCES).ifPresent(resources ->
-                event.getOriginal().getCapability(SIN_RESOURCES)
-                        .ifPresent(resources::copyFrom));
-    }
 }

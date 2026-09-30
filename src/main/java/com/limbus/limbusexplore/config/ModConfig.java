@@ -15,14 +15,18 @@ public final class ModConfig {
             .comment("Whether to log a startup message during mod loading")
             .define("logStartup", true);
 
+    public static final ForgeConfigSpec.BooleanValue KILL_REWARDS_ENABLED = BUILDER
+            .comment("Player kills of hostile enemies grant 1 Wrath and 3 Sanity")
+            .define("killRewardsEnabled", true);
+
     public static final ForgeConfigSpec.BooleanValue DAMAGE_KIND_ENABLED = BUILDER
             .comment("Enable slash/pierce/blunt damage kinds and their resistances",
-                    "关掉之后本 mod 不再改伤害数值（混乱值仍然累计）")
+                    "关掉只禁用三系抗性/等级修正，混乱累计和混乱挨打倍率由 chaosEnabled 控制")
             .define("damageKindEnabled", true);
 
     public static final ForgeConfigSpec.BooleanValue CHAOS_ENABLED = BUILDER
             .comment("Enable the chaos (stagger) system: damage builds chaos, zero triggers a 15s lock",
-                    "关掉之后挨打不再扣混乱值、也不会触发混乱状态（已在混乱中的会正常结束）")
+                    "关掉之后停止累计和混乱增伤，已在混乱中的实体在下次 tick 解除")
             .define("chaosEnabled", true);
 
     public static final ForgeConfigSpec.BooleanValue CHAOS_MARK_ENABLED = BUILDER

@@ -10,7 +10,6 @@ import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.CapabilityManager;
 import net.minecraftforge.common.capabilities.CapabilityToken;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -36,11 +35,6 @@ public final class ResistanceCapabilities {
         }
     }
 
-    @SubscribeEvent
-    public static void onPlayerClone(PlayerEvent.Clone event) {
-        event.getEntity().getCapability(RESISTANCE).ifPresent(resistance ->
-                event.getOriginal().getCapability(RESISTANCE).ifPresent(resistance::copyFrom));
-    }
 
     /** 实体 tag：某个系 + 某个分级的 tag */
     public static TagKey<EntityType<?>> tierTag(DamageKind kind, String tier) {

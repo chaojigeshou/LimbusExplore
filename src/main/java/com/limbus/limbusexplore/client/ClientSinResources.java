@@ -25,7 +25,7 @@ public final class ClientSinResources {
         }
         int i = 0;
         for (SinType type : SinType.values()) {
-            VALUES.put(type, Math.max(0, values[i++]));
+            VALUES.put(type, values[i++]); // 侵蚀透支必须如实显示，不能在客户端抹成零。
         }
     }
 

@@ -22,7 +22,7 @@ public final class EgoResistance implements EgoStateListener {
 
     @SubscribeEvent
     public static void onCommonSetup(FMLCommonSetupEvent event) {
-        EgoStateApi.registerListener(INSTANCE);
+        event.enqueueWork(() -> EgoStateApi.registerListener(INSTANCE));
     }
 
     @Override

@@ -70,7 +70,7 @@ class EgoStateTest {
 
     // 下线期间把 30 秒走完了，上来就是没状态
     @Test
-    void expiredSaveLoadsAsIdle() {
+    void expiredSaveRetainsMarkerUntilServerCleanup() {
         CompoundTag tag = new CompoundTag();
         tag.putLong("endAt", System.currentTimeMillis() - 1);
         tag.putString("egoId", Ego.TEST_ALEPH.id);
@@ -80,6 +80,9 @@ class EgoStateTest {
         loaded.load(tag);
 
         assertFalse(loaded.isActive(System.currentTimeMillis()));
-        assertEquals(null, loaded.activeEgo());
+        assertEquals(Ego.TEST_ALEPH, loaded.activeEgo());
+        assertTrue(loaded.hasState());
+        loaded.clear();
+        assertFalse(loaded.hasState());
     }
 }

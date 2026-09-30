@@ -1,23 +1,22 @@
 package com.limbus.limbusexplore.client;
 
-import com.google.gson.Gson;
 import com.limbus.limbusexplore.ego.Ego;
+import com.limbus.limbusexplore.ego.EgoLoadout;
 import com.limbus.limbusexplore.ego.RiskLevel;
+import com.limbus.limbusexplore.net.EgoEquipPacket;
+import com.limbus.limbusexplore.net.ModNetworking;
 import net.minecraft.client.Minecraft;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.Arrays;
 
-// 客户端装备状态：5 槽，每个槽固定一个等级（1=ZAYIN .. 5=ALEPH），EGO 只能进对应槽。
-// 自动持久化到 <游戏目录>/limbusexplore_loadout.json，重启客户端保留。
-// 联机同步落地时换成服务端数据（本地文件先作为客户端存储用）。
+// 仅保存服务端装备快照；装备/卸下只发送请求，收到 S2C 后才更新界面。
+// 旧 limbusexplore_loadout.json 不再读取或写入，避免跨存档和跨服务器共享装备。
 public final class ClientEgoLoadout {
 
-    public static final int SLOTS = 5;
+    public static final int SLOTS = EgoLoadout.SLOTS;
 
-    private static final Gson GSON = new Gson();
-
-    private static final Ego[] EQUIPPED = new Ego[SLOTS];
+    private static final EgoLoadout LOADOUT = new EgoLoadout();
+    private static boolean ready;
     // 每个槽的待发形态：true = 已长按切到侵蚀态（右键取消），释放时按这个走
     private static final boolean[] CORRODED = new boolean[SLOTS];
 
@@ -25,64 +24,44 @@ public final class ClientEgoLoadout {
     private static Ego[] cachedList = new Ego[0];
     private static boolean dirty = true;
 
-    static {
-        load();
-    }
-
     private ClientEgoLoadout() {
     }
 
-    private static Path storeFile() {
-        return Minecraft.getInstance().gameDirectory.toPath().resolve("limbusexplore_loadout.json");
+    public static void applySnapshot(String[] ids) {
+        applySnapshot(ids, new String[0]);
     }
 
-    private static void load() {
-        try {
-            Path file = storeFile();
-            if (!Files.exists(file)) {
-                return;
-            }
-            String[] ids = GSON.fromJson(Files.readString(file), String[].class);
-            if (ids == null || ids.length != SLOTS) {
-                return;
-            }
-            for (int slot = 0; slot < SLOTS; slot++) {
-                Ego ego = ids[slot] == null ? null : Ego.byId(ids[slot]);
-                // 等级不匹配（配置被改过/枚举变了）就当空的，别硬塞
-                if (ego != null && canEquip(slot, ego)) {
-                    EQUIPPED[slot] = ego;
-                } else {
-                    EQUIPPED[slot] = null;
-                }
-            }
-            dirty = true;
-        } catch (Exception ignored) {
-            // 文件损坏就按空配置走，不挡启动
-        }
+    public static void applySnapshot(String[] ids, String[] unlocked) {
+        LOADOUT.setUnlockedIds(unlocked);
+        LOADOUT.fromIds(ids);
+        Arrays.fill(CORRODED, false);
+        dirty = true;
+        ready = true;
     }
 
-    private static void save() {
-        try {
-            String[] ids = new String[SLOTS];
-            for (int slot = 0; slot < SLOTS; slot++) {
-                ids[slot] = EQUIPPED[slot] == null ? null : EQUIPPED[slot].id;
-            }
-            Files.writeString(storeFile(), GSON.toJson(ids));
-        } catch (Exception ignored) {
-        }
+    /** 断开连接时清空，下一服务器的首次快照到达前禁止发送装备请求。 */
+    public static void clear() {
+        LOADOUT.setUnlockedIds(new String[0]);
+        LOADOUT.fromIds(new String[0]);
+        Arrays.fill(CORRODED, false);
+        cachedList = new Ego[0];
+        dirty = true;
+        ready = false;
     }
 
     public static Ego get(int slot) {
-        return EQUIPPED[slot];
+        return LOADOUT.get(slot);
     }
 
     public static boolean isCorroded(int slot) {
-        return CORRODED[slot];
+        return EgoLoadout.isValidSlot(slot) && CORRODED[slot];
     }
 
     // 释放界面长按切换侵蚀态、右键取消都走这里（改不了装备本身，只改形态）
     public static void setCorroded(int slot, boolean corroded) {
-        CORRODED[slot] = corroded;
+        if (LOADOUT.get(slot) != null) {
+            CORRODED[slot] = corroded;
+        }
     }
 
     /** 槽位对应的固定等级，槽 0..4 → ZAYIN..ALEPH。 */
@@ -91,46 +70,41 @@ public final class ClientEgoLoadout {
     }
 
     public static boolean canEquip(int slot, Ego ego) {
-        return ego.level == levelOfSlot(slot);
+        return EgoLoadout.canEquip(slot, ego) && LOADOUT.isUnlocked(ego);
     }
 
-    // 等级不匹配返回 false；EGO 已经装在哪格会自动腾出来，不重复装
+    public static boolean isUnlocked(Ego ego) {
+        return LOADOUT.isUnlocked(ego);
+    }
+
+    // 返回 true 仅代表已发送请求；实际装备结果由服务端快照决定。
     public static boolean equip(int slot, Ego ego) {
-        if (!canEquip(slot, ego)) {
+        if (!ready || !canEquip(slot, ego) || Minecraft.getInstance().getConnection() == null) {
             return false;
         }
-        for (int i = 0; i < SLOTS; i++) {
-            if (EQUIPPED[i] == ego) {
-                EQUIPPED[i] = null;
-                CORRODED[i] = false;
-            }
-        }
-        EQUIPPED[slot] = ego;
-        CORRODED[slot] = false;
-        dirty = true;
-        save();
+        ModNetworking.sendToServer(new EgoEquipPacket(slot, ego.id));
         return true;
     }
 
     public static void unequip(int slot) {
-        EQUIPPED[slot] = null;
-        CORRODED[slot] = false;
-        dirty = true;
-        save();
+        if (ready && EgoLoadout.isValidSlot(slot) && Minecraft.getInstance().getConnection() != null) {
+            ModNetworking.sendToServer(new EgoEquipPacket(slot, ""));
+        }
     }
 
     /** 只含非空槽、按槽位顺序（Z 最左）的已装备列表。渲染频繁调用，内部有缓存。 */
     public static Ego[] equippedList() {
         if (dirty) {
             int count = 0;
-            for (Ego ego : EQUIPPED) {
-                if (ego != null) {
+            for (int slot = 0; slot < SLOTS; slot++) {
+                if (LOADOUT.get(slot) != null) {
                     count++;
                 }
             }
             Ego[] list = new Ego[count];
             int i = 0;
-            for (Ego ego : EQUIPPED) {
+            for (int slot = 0; slot < SLOTS; slot++) {
+                Ego ego = LOADOUT.get(slot);
                 if (ego != null) {
                     list[i++] = ego;
                 }

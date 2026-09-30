@@ -22,7 +22,11 @@ public final class EgoReleaseClient {
             return;
         }
 
-        EgoApi.ReleaseResult result = EgoApi.ReleaseResult.values()[resultOrdinal];
+        EgoApi.ReleaseResult[] results = EgoApi.ReleaseResult.values();
+        if (resultOrdinal < 0 || resultOrdinal >= results.length) {
+            return;
+        }
+        EgoApi.ReleaseResult result = results[resultOrdinal];
         if (result == EgoApi.ReleaseResult.CORRODED) {
             // 侵蚀释放：红色火焰粒子 + 提示 + 顶部侵蚀闪光横幅
             minecraft.player.displayClientMessage(
@@ -48,6 +52,12 @@ public final class EgoReleaseClient {
                         minecraft.player.getY() + 1.6 + minecraft.player.getRandom().nextGaussian() * 0.2,
                         minecraft.player.getZ() + spread, 0, 0.1, 0);
             }
+        } else if (result == EgoApi.ReleaseResult.UNAVAILABLE) {
+            minecraft.player.displayClientMessage(
+                    Component.translatable("ego.limbusexplore.unavailable"), true);
+        } else if (result == EgoApi.ReleaseResult.NOT_EQUIPPED) {
+            minecraft.player.displayClientMessage(
+                    Component.translatable("ego.limbusexplore.not_equipped"), true);
         } else if (result == EgoApi.ReleaseResult.IN_EGO_STATE) {
             minecraft.player.displayClientMessage(
                     Component.translatable("ego.limbusexplore.in_ego_state"), true);

@@ -2,6 +2,25 @@
 
 Minecraft 1.20.1 Forge mod（Forge 47.3.0）。
 
+## 0.3.0：可玩的 EGO 链路
+
+本轮保留既有 HUD、侵蚀着色器和五个测试条目的存档 ID，重构服务端装备、释放事务与生命周期，并增加原创示例 EGO **余烬守望**。
+这不是原作技能复刻，也不包含人格、拼点或回合制系统。
+
+1. 用 **纸 + 煤炭 + 铁锭** 无序合成「余烬守望 · E.G.O 凭证」。获得纸后会解锁配方书条目。
+2. 右键凭证，在服务端永久解锁。重复使用不会消耗凭证。
+3. 按 **G**，选择 **ZAYIN** 槽，再选择余烬守望；等待服务端确认后显示装备。
+4. 玩家击杀敌对生物获得 **1 暴怒 + 3 理智**。玩家和被动生物不提供奖励；服主可关闭该规则。
+5. 按 **R**，短按普通释放：消耗 **2 暴怒、10 理智**，对前方 120°、4 格内可见敌对生物造成基础 **8 打击伤害**。
+6. 长按切换侵蚀，再短按释放：消耗乘 1.5 并允许透支；改为周身 6 格、基础 **12 打击伤害**。两种形态均不穿墙、不伤害玩家或友方，仍经过原版护甲与伤害事件。
+7. 进入 **30 秒 EGO 状态**，期间打击抗性 ×0.5，禁止再次释放和换装。状态结束清除临时覆盖及负罪孽余额。
+
+死亡结束 EGO/混乱，但保留解锁、装备、正罪孽余额和理智；换维与非死亡克隆保留未过期状态，重建临时抗性，不重放瞬时技能。
+离线时 EGO 的现实时间倒计时继续，重登后先处理过期清理。客户端断线清空所有本地状态镜像。
+
+**安装**：客户端与服务端同时替换为 0.3.0，不要把多个版本一起放进 mods。网络协议为 `4`。
+首次从纯客户端装备版本升级需按 G 重新装备；已有服务端装备存档可继续使用。
+
 ## 构建
 
 要求 JDK 17（`org.gradle.java.home` 或用户级 `~/.gradle/gradle.properties` 里配置）。
@@ -22,7 +41,7 @@ Minecraft 1.20.1 Forge mod（Forge 47.3.0）。
 | `sin/SinCapabilities` + `SinResourcesProvider` | capability 定义与挂载（键 `limbusexplore:sin_resources`），玩家死亡克隆跟随 |
 | `sin/SinApi` | 业务入口。改完自动同步客户端 |
 | `client/ClientSinResources` | 客户端镜像。`set(int[7])`、`get(SinType)`、`canPayClient(SinCost[])` |
-| `net/PlayerSinSync` | 登录/换维/重生自动全量同步；`sync(Player)` |
+| `net/PlayerDataSync` | 登录/换维/重生自动全量同步；`syncSin(Player)` |
 | `net/SinSyncPacket` | S2C，int[7] |
 
 `SinApi` 方法：
@@ -43,10 +62,15 @@ boolean consumeAll(Player, SinCost[]);  // 全够才一起扣
 |----|------|
 | `ego/RiskLevel` | 等级枚举：ZAYIN/TETH/HE/WAW/ALEPH。`id`、`color`、`displayKey()` |
 | `ego/SinCost` | `record SinCost(SinType sin, int amount)` |
-| `ego/Ego` | 字段：`id`、`level`、`sin`、`costs`、`sanityCost`、`resistanceKind`、`resistanceRate`；方法：`displayKey()`、`descKey()`、`awakeningKey()`、`corrosionKey()`、`passiveKey()`、`texture()`、`byId(String)` |
+| `ego/Ego` | 不可变定义目录，不再是枚举；同等级支持多个条目。`costs()` 返回防御性副本，`byId()` 按稳定 ID 查询 |
+| `ego/EgoReleaseTransaction` | 内部纯数据事务：完整校验后统一扣罪孽、理智并写状态，失败不部分扣费 |
+| `ego/EgoSkills` + `ego/skill/EgoSkill` | 定义与执行分离；成功提交后才执行觉醒/侵蚀的一次性技能 |
 | `ego/EgoApi` | 释放判定（服务端）。`check`、`release` 返回 `ReleaseResult` |
 | `ego/EgoResistance` | EGO 状态期间的三系抗性覆盖（`EgoStateListener`，见「EGO 状态」一节） |
-| `client/ClientEgoLoadout` | 5 槽装备状态（客户端本地）。见下 |
+| `ego/EgoLoadout` + `EgoLoadoutCapabilities` + `EgoLoadoutProvider` | 服务端 5 槽装备数据，跟随玩家存档与克隆 |
+| `ego/EgoLoadoutApi` | 可信服务端解锁、装备/卸下、状态与槽位校验、装备查询和同步 |
+| `client/ClientEgoLoadout` | 服务端装备的客户端镜像；装备/卸下只发送请求 |
+| `net/EgoEquipPacket` + `EgoLoadoutSyncPacket` | C2S 单槽修改请求 / S2C 五槽与已解锁 ID 快照；没有 C2S 解锁入口 |
 | `client/gui/EgoLoadoutScreen` | 装备界面 |
 | `client/gui/EgoReleaseScreen` | 释放界面 |
 | `net/EgoReleasePacket` | C2S，参数 egoId |
@@ -61,9 +85,18 @@ ClientEgoLoadout.get(slot);                    // Ego 或 null
 ClientEgoLoadout.equippedList();               // 非空槽的已装备列表（按槽位顺序，内部缓存）
 ClientEgoLoadout.levelOfSlot(slot);            // 槽位固定等级
 ClientEgoLoadout.canEquip(slot, ego);
-ClientEgoLoadout.equip(slot, ego);             // 等级不匹配返回 false；已在别的槽会自动腾出
-ClientEgoLoadout.unequip(slot);
+ClientEgoLoadout.equip(slot, ego);             // true 仅表示已发送请求，收到服务端快照才更新界面
+ClientEgoLoadout.unequip(slot);                // 请求卸下，服务端确认后生效
 ```
+
+服务端通过 `EgoLoadoutApi.set(serverPlayer, slot, ego)` 修改装备（`ego=null` 表示卸下），
+校验槽位范围、等级、存活状态，以及是否处于混乱/EGO 状态。登录、换维、重生与每次装备请求后同步完整快照。
+普通与侵蚀释放都在 `EgoApi` 中检查服务端装备，未装备不扣资源，返回 `NOT_EQUIPPED`。
+
+**升级说明**：不再读取或写入客户端 `limbusexplore_loadout.json`，原文件不删除。
+旧存档首次升级后装备槽为空，需要按 G 重新装备；之后装备按玩家、按存档保存，断线清空客户端镜像。
+五个旧测试 EGO 默认可用；新条目余烬守望需要先使用凭证解锁，解锁数据和装备一起持久化。
+网络协议已升至 `4`，客户端与服务端需同时更新。
 
 `EgoApi`：
 
@@ -74,14 +107,17 @@ EgoApi.ReleaseResult result = EgoApi.release(serverPlayer, ego);
 // SIN_LACK        罪孽资源不够（普通释放）
 // SANITY_LACK     理智不够（普通释放，扣完低于 -45）
 // IN_EGO_STATE    已在 EGO 状态中，禁止释放
+// IN_CHAOS        混乱状态中，禁止释放
+// NOT_EQUIPPED    服务端未装备此 EGO，普通/侵蚀都拒绝，不扣资源
+// UNAVAILABLE     死亡、能力缺失或定义无效；不部分扣费
 EgoApi.check(serverPlayer, ego);          // 只判断不扣（普通释放的预检）
-EgoApi.releaseCorrosion(serverPlayer, ego); // 侵蚀释放：SinApi.consumeAllForced + SanityApi.consumeForce
+EgoApi.releaseCorrosion(serverPlayer, ego); // 同一释放事务，按侵蚀费用扣减
 ```
 
 界面操作：
 
 - 装备界面（G 键）：上排 5 槽，左键选槽、右键卸下；下排 EGO 列表，左键装备（等级不匹配的条目灰显），ESC 关闭
-- 释放界面（R 键）：只显示已装备的 EGO，按槽位顺序从左到右（空槽跳过）；**短按（<500ms）按当前形态释放，长按（>=500ms）切换侵蚀态**（卡片变红、消耗按 1.5 倍展示、角标"侵蚀"），**右键取消侵蚀态**；R 或 ESC 关闭
+- 释放界面（R 键）：只显示已装备的 EGO，按槽位顺序从左到右（空槽跳过）；窄屏自动分页，滚轮/左右方向键切页。**短按（<500ms）按当前形态释放，长按（>=500ms）切换侵蚀态**，**右键取消侵蚀态**；R 或 ESC 关闭
 - 侵蚀态消耗：罪孽组合 ×1.5 向上取整、允许透支为负；理智 ×1.5 向上取整、不查下限直接扣（收缩到 -45）；两者都不够也不拦（透支），状态结束负值归 0
 
 ## EGO 状态（30s）
@@ -90,16 +126,17 @@ EgoApi.releaseCorrosion(serverPlayer, ego); // 侵蚀释放：SinApi.consumeAllF
 
 | 类 | 说明 |
 |----|------|
-| `ego/EgoState` | 状态数据：结束时间（绝对毫秒）、当前 EGO、形态；NBT 存取（过期自动作废） |
+| `ego/EgoState` | 结束时间（绝对毫秒）、当前 EGO、形态；过期保留待清理标记，由服务端完成结束清理 |
 | `ego/EgoStateCapabilities` + `EgoStateProvider` | capability 挂载（键 `limbusexplore:ego_state`） |
 | `ego/EgoStateListener` | 三段钩子（默认空实现，战斗/表现效果挂这里） |
 | `ego/EgoStateApi` | 服务端状态机（enter/end/tick/isInState/remainingSeconds/registerListener/sync） |
 | `ego/EgoResistance` | 已挂上的监听：进状态把 `Ego.resistanceKind` 那一系抗性覆盖成 `resistanceRate` 倍，结束还原 |
 | `client/ClientEgoState` | 客户端镜像（剩余秒数/当前 EGO/形态） |
-| `net/EgoStateSyncPacket` + `PlayerEgoStateSync` | 每秒同步剩余时间；登录/换维/重生全量同步 |
+| `net/EgoStateSyncPacket` + `PlayerDataSync` | 每秒同步剩余时间；登录/换维/重生先恢复/清理再全量同步 |
 
 抗性覆盖走的是 `Resistance` 的**覆盖层**（`setOverride` / `clearOverride`），不动数据包 tag 给的基础值，
-所以不用存旧值、读档也不会把覆盖写死成常驻抗性；HUD 和 Jade 看到的是覆盖之后的实际生效值。
+临时覆盖不写入存档，从有效 EGO 状态重建；旧档中的 `override_*` 不再加载。HUD 和 Jade 看到的是实际生效值。
+`beforeEnter` 保留历史名称，但现在由释放事务成功提交后调用；它不应再次扣费或重放技能。
 
 `EgoStateListener` 三个接口：
 
@@ -116,10 +153,11 @@ EgoStateApi.registerListener(new EgoStateListener() {
 ```java
 boolean EgoStateApi.isInState(player);
 int    EgoStateApi.remainingSeconds(player);
-void   EgoStateApi.enter(ServerPlayer, Ego, boolean corroded);   // 释放成功后由 EgoApi 调用
+void   EgoStateApi.enter(ServerPlayer, Ego, boolean corroded);   // 可信服务端直接入状态，不执行技能
 void   EgoStateApi.end(ServerPlayer);                             // 状态结束（负值归 0 + onEnd）
 void   EgoStateApi.registerListener(EgoStateListener);            // 挂三段钩子
-void   EgoStateApi.sync(Player);                                  // 全量同步（PlayerEgoStateSync 自动调）
+void   EgoStateApi.sync(Player);                                  // 全量同步（PlayerDataSync 自动调）
+void   EgoStateApi.reconcile(ServerPlayer);                       // 恢复有效覆盖，清理离线过期与旧档残留
 ```
 
 ## 侵蚀全屏效果（着色器）
@@ -172,7 +210,8 @@ Chaos.REGEN_INTERVAL = 40;                // 不受击时每 40 tick 回 1 点
 ChaosApi.CHAOS_DAMAGE_MULTIPLIER = 1.5f;  // 混乱中受到的伤害倍率
 ```
 
-- 混乱伤害 = 原伤害 × 1.0 × 类型倍率（近战 1.0 / 弹射物 0.8 / 爆炸及其它 1.2）
+- 混乱伤害取 `LivingHurtEvent` 中经三系抗性/等级修正后的伤害，四舍五入；正伤害最少 1，零伤害/免疫不扣混乱值。这里还未经过原版护甲与吸收结算。
+- 混乱中的伤害继续吃三系抗性，再乘 1.5，不再积累混乱值。两个配置开关独立控制。
 - **混乱状态**：玩家被定身（每 tick 拉回锁定点，客户端输入由 `ChaosLockScreen` 全部吞掉）＋ 禁止攻击 ＋ 禁止释放 EGO（`EgoApi` 返回 `IN_CHAOS`）；怪物停止 AI（清目标 + 停寻路 + 清速度）
 - 进入混乱时发一圈 CRIT 粒子（服务端广播，怪物混乱也能看见）
 
@@ -184,7 +223,7 @@ ChaosApi.CHAOS_DAMAGE_MULTIPLIER = 1.5f;  // 混乱中受到的伤害倍率
 | `sanity/SanityCapabilities` + `SanityProvider` | capability 挂载（键 `limbusexplore:sanity`） |
 | `sanity/SanityApi` | 业务入口，改完自动同步 |
 | `client/ClientSanity` | 客户端镜像 |
-| `net/PlayerSanitySync` + `SanitySyncPacket` | 同步（登录/换维/重生自动） |
+| `net/PlayerDataSync` + `SanitySyncPacket` | 同步（登录/换维/重生自动） |
 
 ```java
 int   SanityApi.get(Player);
@@ -290,14 +329,15 @@ dependencies { compileOnly fg.deobf("maven.modrinth:jade:11.13.3+forge") }
 
 ## 配置与绕过入口
 
-`config/limbusexplore-common.toml`（改动后 `/reload` 或重启生效）。这些开关就是官方绕过入口：整合包不想要哪块机制就关哪块，
+`config/limbusexplore-common.toml`（建议重启后验证；`/reload` 不是 Forge 配置重载命令）。这些开关就是官方绕过入口：整合包不想要哪块机制就关哪块，
 关掉之后本 mod 对应部分不生效，也不影响别的 mod。
 
 | 配置项 | 默认 | 关掉之后 |
 |--------|------|----------|
 | `logStartup` | true | 启动时不再打印 mod 加载日志 |
-| `damageKindEnabled` | true | 本 mod 不再参与伤害数值（三系抗性不生效）；混乱值仍然累计 |
-| `chaosEnabled` | true | 挨打不再扣混乱值、不触发混乱状态；已在混乱中的会正常结束 |
+| `damageKindEnabled` | true | 禁用三系抗性/等级修正；混乱累计和挨打倍率仍由 chaosEnabled 控制 |
+| `chaosEnabled` | true | 不累计、不增伤、不触发混乱；已有混乱在下一 tick 解除 |
+| `killRewardsEnabled` | true | 关闭敌对生物击杀提供暴怒与理智的生存奖励 |
 | `chaosMarkEnabled` | true | 客户端不画混乱头顶标记（纯显示开关，服务端行为不变） |
 | `jadeCompatEnabled` | true | 不往 Jade 送数据，Jade 上看不到本 mod 的任何信息 |
 
@@ -320,7 +360,13 @@ gradlew test        # 只跑 src/test/java，不启动游戏，十几秒
 | `sanity/SanityTest` | ±45 夹取 / `consume` 不破线 / `consumeForce` 收到 -45 |
 | `chaos/ChaosTest` | 扣到 0 才算破防 / 15 秒倒计时 / 每 40 tick 回 1 / 读档不停在 0 |
 | `ego/EgoStateTest` | 30 秒有效性与剩余秒数向上取整 / 过期存档按无状态处理 |
-| `ego/EgoTest` | 每个等级正好一条 EGO（装备界面按等级摆卡片）/ 抗性倍率在档位范围内 / 资源路径约定 |
+| `ego/EgoTest` | 等级覆盖但不限制同级数量 / 抗性倍率 / 资源路径约定 |
+| `ego/EgoReleaseTransactionTest` | 普通/侵蚀费用、失败原子性、重复请求、缺失能力与死亡保护 |
+| `ego/ShockwaveSkillTest` | 扇形方向、范围、周身侵蚀范围 |
+| `combat/DamageResolutionTest` | 两个开关独立性、免疫、零伤害、混乱与抗性叠乘 |
+| `sin/SinPaymentTest` | 同罪孽重复费用合计、欠债偿还、溢出与负费用 |
+| `ego/EgoLoadoutTest` | 槽位与等级边界 / 装备授权和卸下撤销 / NBT 往返 / 损坏或旧存档 / 克隆数据独立性 |
+| `client/ClientEgoLoadoutTest` | 服务端快照更新 / 侵蚀选择重置 / 断线清理 / 首次同步前拒绝装备请求 |
 | `combat/ResistanceTest` | 档位常量 / 覆盖层优先、清掉还原 / 存档不把覆盖写死 |
 | `combat/DamageKindTest` | 三系 tag 路径契约（整合包按这个接）/ `byId` 大小写不敏感 |
 | `combat/CombatFormulaTest` | 等级差恒为 1.0（接上等级系统时改这里） |
@@ -328,6 +374,10 @@ gradlew test        # 只跑 src/test/java，不启动游戏，十几秒
 
 要碰注册表的测试（比如 `ItemTags` 那条 tag 路径）先调 `TestBootstrap.ensure()`，它会 `Bootstrap.bootStrap()`
 把注册表建起来——不建世界、不开客户端。网络包的 `handle` 不测（要建频道），只测编解码。
+
+`gradlew runGameTestServer` 单独运行 `src/gameTest/java` 中的真实 Forge 服务端集成测试，测试类不进发行 JAR。
+测试在 `build/gametest` 的专用世界中执行，不使用玩家存档；覆盖配方/凭证、释放/抗性/墙体遮挡、伪造释放、
+死亡/非死亡克隆、离线过期、自然混乱结束、配置开关和击杀资源奖励。客户端渲染与真实双客户端网络体验仍需人工验收。
 
 ## 架构设计
 
@@ -337,7 +387,7 @@ gradlew test        # 只跑 src/test/java，不启动游戏，十几秒
 data   sin/sanity/ego/chaos/combat 容器+枚举   纯状态，只有 NBT 存取，不 import client/
 api    SinApi/SanityApi/EgoApi/EgoStateApi/ChaosApi/ResistanceApi   业务唯一入口，改完自带同步
 cap    *Capabilities + *Provider    capability 定义与挂载（FORGE 总线）
-net    ModNetworking/包/PlayerDataSync/EgoReleaseService   频道、同步、服务端处理
+net    ModNetworking/包/PlayerDataSync/EgoReleaseService/PlayerDataLifecycle   同步、服务端处理、跨模块生命周期
 client 缓存/界面对话/注册/运行期   只读镜像 + 预检，判定永远在服务端
 compat 第三方 mod 兼容（Jade）   可选依赖，只编译期引用
 command /sins /sanity /chaos /resistance   调试命令（权限 2）
@@ -358,7 +408,7 @@ ego → combat（EGO 覆盖三系抗性）                              combat �
 ### 约定
 
 1. **服务端权威**：判定与扣减全在服务端；客户端只有 `Client*` 镜像和预检（`canPay` 类），预检失败直接提示、不发包
-2. **数据修改必须走 Api**：业务代码不得直接摸 capability、网络包、容器字段；Api 内部保证改完同步
+2. **数据修改必须走 Api**：业务调用从 Api 进入；内部释放事务统一更新容器，生命周期协调器负责克隆与清理；完成后统一同步
 3. **注册集中一处**：网络包全部在 `ModNetworking.register()`；客户端注册全部在 `ClientModEvents`（MOD 总线）；运行期逻辑全部在 `ClientGameEvents`（FORGE 总线）；玩家数据同步监听全部在 `net/PlayerDataSync`
    - 例外：每个模块的 `*Capabilities` 自己 `@Mod.EventBusSubscriber` 挂载能力（缺省 FORGE 总线），删模块时连它一起删就行
 4. **总线**：MOD = 注册，FORGE = 运行期；一个监听类只挂一条总线（混了整类注册失败）
@@ -369,14 +419,26 @@ ego → combat（EGO 覆盖三系抗性）                              combat �
 ### 新模块模板（照 sin 抄）
 
 ```
-容器(EnumMap/NBT) → Provider(ICapabilitySerializable) → Capabilities(attach+clone)
+容器(EnumMap/NBT) → Provider(ICapabilitySerializable) → Capabilities(attach)
 → Api(修改后 PlayerDataSync.syncXxx) → SyncPacket(注册进 ModNetworking) → 客户端镜像 Client*
 ```
 
+跨模块克隆统一放在 `PlayerDataLifecycle`：只恢复旧实体能力一次，复制完成后统一失效，不能各模块重复监听 Clone。
+
 ### 已知待办（架构层面的）
 
-- 装备数据还在客户端（`ClientEgoLoadout`）：联机前搬到服务端 capability，`EgoReleaseService` 补「确实装在槽位上」的校验（否则客户端可伪造 egoId 释放）
+- 服务端装备、解锁、一次性执行与生命周期已接通；新增 EGO 元数据放 `Ego`，行为放 `EgoSkills`，获取方式调用服务端 `EgoLoadoutApi.unlock`
 - 侵蚀相关（理智 -45 崩溃、超频）在战斗系统落地时接 `EgoApi`/`SanityApi.isInChaos`
+
+### 服务端装备改动的游戏内验收
+
+单元测试不代替真实客户端/专用服务端验证。发布前需要逐项检查：
+
+1. 单人 G 界面装备、卸下能在不关闭界面的情况下更新；错等级不能装备。
+2. 重登、死亡重生、跨维度、从末地返回后装备仍保留；另一玩家/另一存档不继承装备。
+3. 普通与侵蚀释放都只允许服务端已装备的 EGO；卸下后伪造释放请求不扣资源、不进入状态。
+4. 混乱或 EGO 状态中伪造换装请求被拒绝；未知 ID、越界槽位不改变原装备。
+5. 断线后连接其他服务器时不显示上一服务器的装备；协议 2/3 与当前 4 不兼容，拒绝连接。
 
 ## 项目结构
 

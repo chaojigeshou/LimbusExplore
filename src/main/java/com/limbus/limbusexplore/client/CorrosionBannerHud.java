@@ -57,6 +57,10 @@ public final class CorrosionBannerHud {
         flashStart = System.currentTimeMillis();
     }
 
+    public static void clearFlash() {
+        flashStart = -1;
+    }
+
     /** ClientModEvents 在 RegisterShadersEvent 里回调；资源包每次重载都会再来一份新的。 */
     public static void acceptShader(ShaderInstance instance) {
         shader = instance;

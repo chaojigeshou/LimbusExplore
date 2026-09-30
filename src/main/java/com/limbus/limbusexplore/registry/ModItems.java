@@ -6,6 +6,8 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
+import com.limbus.limbusexplore.ego.Ego;
+import com.limbus.limbusexplore.item.EgoContractItem;
 
 // 所有物品注册都写在这个类里
 public final class ModItems {
@@ -17,6 +19,8 @@ public final class ModItems {
     public static final RegistryObject<Item> PLACEHOLDER_ITEM = ITEMS.register(
             "placeholder_item",
             () -> new Item(new Item.Properties()));
+    public static final RegistryObject<Item> EMBER_WATCH_CONTRACT = ITEMS.register(
+            "ember_watch_contract", () -> new EgoContractItem(Ego.EMBER_WATCH, new Item.Properties().stacksTo(16)));
 
     private ModItems() {
     }

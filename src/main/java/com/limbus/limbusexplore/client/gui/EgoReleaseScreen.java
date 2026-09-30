@@ -29,13 +29,25 @@ public class EgoReleaseScreen extends Screen {
 
     private int pressSlot = -1;
     private long pressStart;
+    private int page;
 
     public EgoReleaseScreen() {
         super(Component.translatable("screen.limbusexplore.ego_release"));
     }
 
-    private static Ego[] visibleEgos() {
-        return ClientEgoLoadout.equippedList();
+    private int pageSize() {
+        return Math.max(1, (width - 16 + ITEM_GAP) / (ITEM_W + ITEM_GAP));
+    }
+
+    private int pageCount() {
+        return Math.max(1, (ClientEgoLoadout.equippedList().length + pageSize() - 1) / pageSize());
+    }
+
+    private Ego[] visibleEgos() {
+        Ego[] equipped = ClientEgoLoadout.equippedList();
+        page = Math.min(page, pageCount() - 1);
+        int start = page * pageSize();
+        return java.util.Arrays.copyOfRange(equipped, start, Math.min(equipped.length, start + pageSize()));
     }
 
     private static int cardY(int screenHeight) {
@@ -53,10 +65,8 @@ public class EgoReleaseScreen extends Screen {
         int count = visibleEgos().length;
         int y = cardY(height);
         int visible = 0;
-        for (int slot = 0; slot < ClientEgoLoadout.SLOTS; slot++) {
-            if (ClientEgoLoadout.get(slot) == null) {
-                continue;
-            }
+        for (Ego ego : visibleEgos()) {
+            int slot = ego.level.ordinal();
             int x = cardX(visible, count, width);
             if (mouseX >= x && mouseX < x + ITEM_W && mouseY >= y && mouseY < y + ITEM_H) {
                 return slot;
@@ -88,7 +98,7 @@ public class EgoReleaseScreen extends Screen {
             // 侵蚀态不查资源（透支），理智也不查下限
             return true;
         }
-        for (SinCost cost : ego.costs) {
+        for (SinCost cost : ego.costs()) {
             int have = ClientSinResources.get(cost.sin());
             if (have < cost.amount()) {
                 minecraft.player.displayClientMessage(
@@ -133,11 +143,8 @@ public class EgoReleaseScreen extends Screen {
             pressSlot = -1; // 已经切好了，等会儿松开不需要再做任何事
         }
         int visibleIndex = 0;
-        for (int slot = 0; slot < ClientEgoLoadout.SLOTS; slot++) {
-            Ego ego = ClientEgoLoadout.get(slot);
-            if (ego == null) {
-                continue;
-            }
+        for (Ego ego : visible) {
+            int slot = ego.level.ordinal();
             int x = cardX(visibleIndex, visible.length, width);
             int y = y0;
             visibleIndex++;
@@ -149,7 +156,7 @@ public class EgoReleaseScreen extends Screen {
             }
 
             boolean corroded = ClientEgoLoadout.isCorroded(slot);
-            boolean fits = ClientSinResources.canPayClient(ego.costs);
+            boolean fits = ClientSinResources.canPayClient(ego.costs());
             boolean sanityFits = ClientSanity.get() - ego.sanityCost >= Sanity.MIN;
             boolean hover = mouseX >= x && mouseX < x + ITEM_W && mouseY >= y && mouseY < y + ITEM_H;
 
@@ -179,7 +186,7 @@ public class EgoReleaseScreen extends Screen {
 
             // 所需资源（组合，每个一行）；侵蚀态按 1.5 倍向上取整显示
             int costY = y + 122;
-            for (SinCost cost : ego.costs) {
+            for (SinCost cost : ego.costs()) {
                 int amount = corroded ? (cost.amount() * 3 + 1) / 2 : cost.amount();
                 gui.blit(cost.sin().texture(), x + 18, costY, 0, 0, 14, 14, 16, 16);
                 String label = Component.translatable(cost.sin().displayKey()).getString() + " ×" + amount;
@@ -191,12 +198,12 @@ public class EgoReleaseScreen extends Screen {
 
             // 理智消耗（侵蚀态 1.5 倍 + 允许扣穿），不够红
             int sanityCost = corroded ? (ego.sanityCost * 3 + 1) / 2 : ego.sanityCost;
-            gui.drawCenteredString(font, "理智 -" + sanityCost, x + ITEM_W / 2, costY + 2,
+            gui.drawCenteredString(font, Component.translatable("screen.limbusexplore.sanity_cost", sanityCost), x + ITEM_W / 2, costY + 2,
                     (corroded || sanityFits) ? 0xFF9FD8FF : 0xFFE04B4B);
 
             // 侵蚀态角标
             if (corroded) {
-                gui.drawString(font, "侵蚀", x + ITEM_W - 36, y + 4, 0xFFE04B4B, false);
+                gui.drawString(font, Component.translatable("screen.limbusexplore.corrosion"), x + ITEM_W - 36, y + 4, 0xFFE04B4B, false);
             }
 
             // 长按进度：从底部往上铺满整张卡片，红色半透明
@@ -209,6 +216,9 @@ public class EgoReleaseScreen extends Screen {
 
         gui.drawCenteredString(font, Component.translatable("screen.limbusexplore.ego_release_hint"),
                 width / 2, y0 + ITEM_H + 8, 0xFFAAAAAA);
+        if (pageCount() > 1) gui.drawCenteredString(font,
+                Component.translatable("screen.limbusexplore.ego_page", page + 1, pageCount()),
+                width / 2, y0 + ITEM_H + 21, 0xFFAAAAAA);
     }
 
     @Override
@@ -263,10 +273,25 @@ public class EgoReleaseScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_LEFT || keyCode == GLFW.GLFW_KEY_RIGHT) {
+            changePage(keyCode == GLFW.GLFW_KEY_RIGHT ? 1 : -1);
+            return true;
+        }
         if (keyCode == GLFW.GLFW_KEY_R) {
             onClose();
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private void changePage(int delta) {
+        page = Math.max(0, Math.min(pageCount() - 1, page + delta));
+        pressSlot = -1;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        changePage(delta < 0 ? 1 : -1);
+        return true;
     }
 }

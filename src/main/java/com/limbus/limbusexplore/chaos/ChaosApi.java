@@ -48,7 +48,7 @@ public final class ChaosApi {
 
     public static boolean isInChaos(LivingEntity entity) {
         Chaos chaos = of(entity);
-        return chaos != null && chaos.isInChaos();
+        return ModConfig.CHAOS_ENABLED.get() && chaos != null && chaos.isInChaos();
     }
 
     public static int remainingSeconds(LivingEntity entity) {
@@ -57,6 +57,7 @@ public final class ChaosApi {
     }
 
     public static void set(LivingEntity entity, int value) {
+        if (!ModConfig.CHAOS_ENABLED.get()) return;
         Chaos chaos = of(entity);
         if (chaos == null) {
             return;
@@ -71,6 +72,7 @@ public final class ChaosApi {
 
     /** 扣混乱值；扣到 0 进入混乱，返回是否进入了混乱。 */
     public static boolean damage(LivingEntity entity, int amount) {
+        if (amount <= 0) return false;
         if (!ModConfig.CHAOS_ENABLED.get()) {
             return false;   // 官方绕过入口：关掉混乱系统后挨打不再累计
         }
@@ -102,15 +104,14 @@ public final class ChaosApi {
     /** 手动解除混乱并回满。 */
     public static void endChaos(LivingEntity entity) {
         Chaos chaos = of(entity);
-        if (chaos == null || !chaos.isInChaos()) {
+        if (chaos == null || (!chaos.isInChaos() && !chaos.hasLock())) {
             return;
         }
-        chaos.tickChaos();
-        while (chaos.getChaosTicks() > 0) {
-            chaos.tickChaos();
-        }
-        chaos.clearLock();
-        chaos.refill();
+        finishChaos(entity, chaos);
+    }
+
+    private static void finishChaos(LivingEntity entity, Chaos chaos) {
+        chaos.reset();
         for (ChaosListener listener : LISTENERS) {
             listener.onEnd(entity, chaos);
         }
@@ -125,8 +126,11 @@ public final class ChaosApi {
         if (chaos == null) {
             return;
         }
-        chaos.reset();
-        sync(entity);
+        if (chaos.isInChaos() || chaos.hasLock()) finishChaos(entity, chaos);
+        else {
+            chaos.reset();
+            sync(entity);
+        }
     }
 
     private static void enterChaos(LivingEntity entity, Chaos chaos) {
@@ -158,9 +162,17 @@ public final class ChaosApi {
         if (chaos == null) {
             return;
         }
+        if (!ModConfig.CHAOS_ENABLED.get()) {
+            reset(entity);
+            return;
+        }
         if (chaos.isInChaos()) {
             holdStill(entity, chaos);
             chaos.tickChaos();
+            if (!chaos.isInChaos()) {
+                finishChaos(entity, chaos);
+                return;
+            }
             int seconds = chaos.getRemainingSeconds();
             if (seconds != chaos.getNotifiedSecond()) {
                 chaos.setNotifiedSecond(seconds);
@@ -168,9 +180,6 @@ public final class ChaosApi {
                     listener.whileInChaos(entity, chaos, seconds);
                 }
                 sync(entity);
-            }
-            if (chaos.getChaosTicks() <= 0) {
-                endChaos(entity);
             }
             return;
         }

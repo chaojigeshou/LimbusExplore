@@ -18,8 +18,11 @@ public final class ModCreativeTabs {
             () -> CreativeModeTab.builder()
                     // 不设 title 的话标签会显示空白，translatable 键要对应 lang 里的 itemGroup.limbusexplore.*
                     .title(Component.translatable("itemGroup.limbusexplore.limbus_explore_tab"))
-                    .icon(() -> ModItems.PLACEHOLDER_ITEM.get().getDefaultInstance())
-                    .displayItems((parameters, output) -> output.accept(ModItems.PLACEHOLDER_ITEM.get()))
+                    .icon(() -> ModItems.EMBER_WATCH_CONTRACT.get().getDefaultInstance())
+                    .displayItems((parameters, output) -> {
+                        output.accept(ModItems.EMBER_WATCH_CONTRACT.get());
+                        output.accept(ModItems.PLACEHOLDER_ITEM.get());
+                    })
                     .build());
 
     private ModCreativeTabs() {

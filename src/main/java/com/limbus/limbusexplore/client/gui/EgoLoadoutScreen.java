@@ -8,7 +8,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 // G 键打开：上排 5 个槽（等级固定 Z~A），下排可选 EGO 列表。
-// 只读 ClientEgoLoadout，未来的服务端同步替换的是数据层，这里不动。
+// 读取服务端装备快照，点击只发请求，收到确认后显示实际装备。
 public class EgoLoadoutScreen extends Screen {
 
     private static final int PANEL_W = 384;
@@ -25,9 +25,17 @@ public class EgoLoadoutScreen extends Screen {
     private int panelX;
     private int panelY;
     private int selectedSlot;
+    private int firstRow;
+    private static final int VISIBLE_ROWS = 6;
 
     public EgoLoadoutScreen() {
         super(Component.translatable("screen.limbusexplore.ego_loadout"));
+    }
+
+    @Override
+    public boolean isPauseScreen() {
+        // 单人游戏也必须允许集成服务端处理装备请求，不能等关屏后才确认。
+        return false;
     }
 
     @Override
@@ -41,7 +49,7 @@ public class EgoLoadoutScreen extends Screen {
     }
 
     private int egoY(int index) {
-        return panelY + EGO_Y + index * EGO_H;
+        return panelY + EGO_Y + (index - firstRow) * EGO_H;
     }
 
     @Override
@@ -83,7 +91,8 @@ public class EgoLoadoutScreen extends Screen {
 
         // EGO 列表（下排，与选中槽等级不匹配的灰显）
         Ego[] egos = Ego.values();
-        for (int i = 0; i < egos.length; i++) {
+        Ego hovered = null;
+        for (int i = firstRow; i < Math.min(egos.length, firstRow + VISIBLE_ROWS); i++) {
             int x = panelX + 12;
             int y = egoY(i);
             boolean hover = mouseX >= x && mouseX < x + PANEL_W - 24 && mouseY >= y && mouseY < y + EGO_H;
@@ -93,11 +102,24 @@ public class EgoLoadoutScreen extends Screen {
             gui.blit(egos[i].sin.texture(), x + 46, y + 3, 0, 0, 16, 16, 16, 16);
             gui.drawString(font, Component.translatable(egos[i].displayKey()), x + 66, y + 6,
                     fits ? 0xFFFFFF : 0xFF707070, false);
+            if (!ClientEgoLoadout.isUnlocked(egos[i])) {
+                Component locked = Component.translatable("ego.limbusexplore.locked");
+                gui.drawString(font, locked, x + PANEL_W - 32 - font.width(locked), y + 6, 0xFFD49A68, false);
+            }
+            if (hover) hovered = egos[i];
         }
 
         // 操作提示
         gui.drawString(font, Component.translatable("screen.limbusexplore.ego_hint"),
                 panelX + 12, panelY + PANEL_H - 14, 0xFFAAAAAA, false);
+        if (hovered != null && hovered.requiresUnlock()) {
+            java.util.List<net.minecraft.util.FormattedCharSequence> lines = new java.util.ArrayList<>();
+            for (String key : new String[]{hovered.awakeningKey(), hovered.corrosionKey(), hovered.passiveKey(),
+                    "ego.limbusexplore.unlock_hint"}) {
+                lines.addAll(font.split(Component.translatable(key), Math.min(width - 24, 260)));
+            }
+            gui.renderTooltip(font, lines, mouseX, mouseY);
+        }
     }
 
     @Override
@@ -118,7 +140,7 @@ public class EgoLoadoutScreen extends Screen {
 
         // EGO 列表：左键装备到选中槽（等级匹配才成功）
         Ego[] egos = Ego.values();
-        for (int i = 0; i < egos.length; i++) {
+        for (int i = firstRow; i < Math.min(egos.length, firstRow + VISIBLE_ROWS); i++) {
             int x = panelX + 12;
             int y = egoY(i);
             if (mouseX >= x && mouseX < x + PANEL_W - 24 && mouseY >= y && mouseY < y + EGO_H) {
@@ -130,5 +152,12 @@ public class EgoLoadoutScreen extends Screen {
         }
 
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        firstRow = Math.max(0, Math.min(Math.max(0, Ego.values().length - VISIBLE_ROWS),
+                firstRow + (delta < 0 ? 1 : -1)));
+        return true;
     }
 }

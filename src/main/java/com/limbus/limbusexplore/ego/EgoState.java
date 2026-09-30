@@ -16,7 +16,12 @@ public final class EgoState {
     private int lastNotifiedSecond = -1;
 
     public boolean isActive(long nowMillis) {
-        return endAtMillis > nowMillis;
+        return activeEgo() != null && endAtMillis > nowMillis;
+    }
+
+    /** 过期/已移除的定义仍保留待清理标记，服务端必须执行一次结束逻辑。 */
+    public boolean hasState() {
+        return !activeEgoId.isEmpty();
     }
 
     public long remainingMillis(long nowMillis) {
@@ -71,9 +76,6 @@ public final class EgoState {
         activeEgoId = tag.getString("egoId");
         corroded = tag.getBoolean("corroded");
         lastNotifiedSecond = -1;
-        // 加载时已过期的按无状态处理
-        if (endAtMillis <= System.currentTimeMillis()) {
-            clear();
-        }
+        // 不在数据层抹掉过期标记，否则离线过期时债务和抗性没有机会被清理。
     }
 }

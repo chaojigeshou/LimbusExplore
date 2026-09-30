@@ -21,9 +21,6 @@ import net.minecraftforge.fml.common.Mod;
 @Mod.EventBusSubscriber(modid = LimbusExplore.MODID)
 public final class CombatHandler {
 
-    /** 混乱伤害系数：混乱伤害 = 结算后伤害 × 系数 */
-    private static final double STAGGER_COEFFICIENT = 1.0;
-
     private CombatHandler() {
     }
 
@@ -33,24 +30,18 @@ public final class CombatHandler {
         if (target.level().isClientSide) {
             return;
         }
-        if (!ModConfig.DAMAGE_KIND_ENABLED.get()) {
-            return;
-        }
 
         DamageSource source = event.getSource();
         Entity attackerEntity = source.getEntity();
         LivingEntity attacker = attackerEntity instanceof LivingEntity living ? living : null;
         DamageKind kind = DamageKindApi.resolve(source, attackerEntity);
 
-        float raw = event.getAmount();
-        if (ChaosApi.isInChaos(target)) {
-            // 混乱就是挨打窗口：伤害放大，不再累计混乱值
-            event.setAmount(raw * ChaosApi.CHAOS_DAMAGE_MULTIPLIER);
-            return;
-        }
-
-        float finalDamage = CombatFormula.finalDamage(attacker, target, kind, raw);
-        event.setAmount(finalDamage);
-        ChaosApi.damage(target, (int) Math.max(1, Math.round(finalDamage * STAGGER_COEFFICIENT)));
+        boolean kindsEnabled = ModConfig.DAMAGE_KIND_ENABLED.get();
+        DamageResolution result = DamageResolution.resolve(event.getAmount(),
+                kindsEnabled ? ResistanceApi.multiplier(target, kind) : 1,
+                CombatFormula.levelDeltaMultiplier(attacker, target), ChaosApi.isInChaos(target),
+                kindsEnabled, ModConfig.CHAOS_ENABLED.get());
+        event.setAmount(result.healthDamage());
+        if (result.staggerDamage() > 0) ChaosApi.damage(target, result.staggerDamage());
     }
 }
