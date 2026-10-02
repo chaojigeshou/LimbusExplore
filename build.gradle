@@ -15,6 +15,18 @@ base {
 // Mojang ships Java 17 to end users in 1.18+, so your mod should target Java 17.
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
+// 真实 Forge 服务端集成测试独立于发行 JAR，不向玩家安装包加入测试类。
+sourceSets {
+    gameTest {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+    uiPreview {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
 minecraft {
     // The mappings can be changed at any time and must be in the following format.
@@ -84,6 +96,15 @@ minecraft {
         client {
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
             property 'forge.enabledGameTestNamespaces', mod_id
+            if (project.hasProperty('egoUiPreview')) {
+                workingDirectory project.file('build/ui-preview')
+                property 'limbusexplore.uiPreview', 'true'
+                property 'limbusexplore.uiPreviewOutput', project.findProperty('egoUiPreviewOutput') ?: project.file('build/ui-preview/screenshots').absolutePath
+                property 'forge.logging.console.level', 'info'
+                mods {
+                    "${mod_id}" { source sourceSets.uiPreview }
+                }
+            }
         }
 
         server {
@@ -96,6 +117,13 @@ minecraft {
         // The gametest system is also enabled by default for other run configs under the /test command.
         gameTestServer {
             property 'forge.enabledGameTestNamespaces', mod_id
+            property 'forge.logging.console.level', 'info'
+            workingDirectory project.file('build/gametest')
+            mods {
+                "${mod_id}" {
+                    source sourceSets.gameTest
+                }
+            }
         }
 
         data {
@@ -226,4 +254,27 @@ tasks.named('test', Test).configure {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
     options.compilerArgs << '-Xlint:deprecation'
+}
+
+tasks.register('copyGameTestStructures', Copy) {
+    from 'src/gameTest/structures'
+    into 'build/gametest/gameteststructures'
+}
+
+tasks.matching { it.name == 'runGameTestServer' }.configureEach {
+    dependsOn tasks.named('gameTestClasses')
+    dependsOn tasks.named('copyGameTestStructures')
+    doLast {
+        def log = file('build/gametest/logs/latest.log')
+        def summary = log.exists() ? (log.text =~ /(\d+) GAME TESTS COMPLETE/) : null
+        if (summary == null || !summary.find() || summary.group(1).toInteger() == 0) {
+            throw new GradleException('No GameTests ran; check template namespace and test source registration.')
+        }
+    }
+}
+
+if (project.hasProperty('egoUiPreview')) {
+    tasks.matching { it.name == 'runClient' }.configureEach {
+        dependsOn tasks.named('uiPreviewClasses')
+    }
 }

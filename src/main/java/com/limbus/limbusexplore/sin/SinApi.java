@@ -49,6 +49,7 @@ public final class SinApi {
 
     // 够扣才扣，不够返回 false
     public static boolean consume(Player player, SinType type, int amount) {
+        if (amount < 0) return false;
         SinResources resources = of(player);
         if (resources == null || resources.get(type) < amount) {
             return false;
@@ -63,12 +64,7 @@ public final class SinApi {
         if (resources == null) {
             return false;
         }
-        for (SinCost cost : costs) {
-            if (resources.get(cost.sin()) < cost.amount()) {
-                return false;
-            }
-        }
-        return true;
+        return resources.canPay(costs);
     }
 
     // 一组消耗全够才一起扣，扣一半这种事不做
@@ -80,9 +76,7 @@ public final class SinApi {
         if (resources == null) {
             return false;
         }
-        for (SinCost cost : costs) {
-            resources.add(cost.sin(), -cost.amount());
-        }
+        resources.consumeAll(costs, false);
         PlayerDataSync.syncSin(player);
         return true;
     }
@@ -93,9 +87,7 @@ public final class SinApi {
         if (resources == null) {
             return;
         }
-        for (SinCost cost : costs) {
-            resources.forceAdd(cost.sin(), -cost.amount());
-        }
+        resources.consumeAll(costs, true);
         PlayerDataSync.syncSin(player);
     }
 

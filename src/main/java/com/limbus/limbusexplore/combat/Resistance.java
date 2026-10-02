@@ -83,22 +83,16 @@ public final class Resistance {
         for (DamageKind kind : DamageKind.values()) {
             // 存基础值，覆盖层单独存，别把临时覆盖写死进基础值
             tag.putFloat(kind.id, getBase(kind));
-            if (override.containsKey(kind)) {
-                tag.putFloat("override_" + kind.id, override.get(kind));
-            }
         }
         tag.putBoolean("tagged", tagged);
         return tag;
     }
 
     public void load(CompoundTag tag) {
+        override.clear();
         for (DamageKind kind : DamageKind.values()) {
-            if (tag.contains(kind.id)) {
-                values.put(kind, tag.getFloat(kind.id));
-            }
-            if (tag.contains("override_" + kind.id)) {
-                override.put(kind, tag.getFloat("override_" + kind.id));
-            }
+            float value = tag.contains(kind.id) ? tag.getFloat(kind.id) : NORMAL;
+            set(kind, Float.isFinite(value) ? value : NORMAL);
         }
         tagged = tag.getBoolean("tagged");
     }

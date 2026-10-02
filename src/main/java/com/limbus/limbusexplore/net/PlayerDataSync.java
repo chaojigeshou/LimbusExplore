@@ -4,6 +4,7 @@ import com.limbus.limbusexplore.LimbusExplore;
 import com.limbus.limbusexplore.chaos.ChaosApi;
 import com.limbus.limbusexplore.combat.ResistanceApi;
 import com.limbus.limbusexplore.ego.EgoStateApi;
+import com.limbus.limbusexplore.ego.EgoLoadoutApi;
 import com.limbus.limbusexplore.sanity.SanityCapabilities;
 import com.limbus.limbusexplore.sin.SinCapabilities;
 import net.minecraft.server.level.ServerPlayer;
@@ -33,6 +34,8 @@ public final class PlayerDataSync {
 
     @SubscribeEvent
     public static void onPlayerDimensionChange(PlayerEvent.PlayerChangedDimensionEvent event) {
+        var chaos = ChaosApi.of(event.getEntity());
+        if (chaos != null) chaos.clearLock(); // 新维度不能传送回旧维度锁定坐标。
         syncAll(event.getEntity());
     }
 
@@ -50,11 +53,23 @@ public final class PlayerDataSync {
     }
 
     private static void syncAll(Player player) {
+        if (player instanceof ServerPlayer serverPlayer) EgoStateApi.reconcile(serverPlayer);
         syncSin(player);
         syncSanity(player);
         EgoStateApi.sync(player);
+        EgoLoadoutApi.sync(player);
         ChaosApi.sync(player);   // Player 本身就是 LivingEntity
         ResistanceApi.sync(player);
+    }
+
+    @SubscribeEvent
+    public static void onStartTracking(PlayerEvent.StartTracking event) {
+        if (event.getEntity() instanceof ServerPlayer player && event.getTarget() instanceof LivingEntity target) {
+            var chaos = ChaosApi.of(target);
+            if (chaos != null && chaos.isInChaos()) {
+                ModNetworking.sendToPlayer(player, new EntityChaosPacket(target.getId(), chaos.getChaosTicks()));
+            }
+        }
     }
 
     /** 罪孽资源全量同步（SinApi 修改后也调它）。 */

@@ -8,7 +8,6 @@ import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.CapabilityManager;
 import net.minecraftforge.common.capabilities.CapabilityToken;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -31,10 +30,4 @@ public final class SanityCapabilities {
         }
     }
 
-    // 同上：死亡重生时，理智跟着旧身体走
-    @SubscribeEvent
-    public static void onPlayerClone(PlayerEvent.Clone event) {
-        event.getEntity().getCapability(SANITY).ifPresent(sanity ->
-                event.getOriginal().getCapability(SANITY).ifPresent(sanity::copyFrom));
-    }
 }

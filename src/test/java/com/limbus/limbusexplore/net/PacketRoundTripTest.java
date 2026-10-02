@@ -9,6 +9,7 @@ import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 同步包的编解码往返。这里不碰 ModNetworking（那要建频道），
@@ -43,6 +44,49 @@ class PacketRoundTripTest {
     void egoStateSyncPacket() {
         assertRoundTrip(new EgoStateSyncPacket(0, "", false), EgoStateSyncPacket::encode, EgoStateSyncPacket::decode);
         assertRoundTrip(new EgoStateSyncPacket(30, "test_aleph_ego", true), EgoStateSyncPacket::encode, EgoStateSyncPacket::decode);
+    }
+
+    @Test
+    void egoEquipPacket() {
+        assertRoundTrip(new EgoEquipPacket(0, "test_zayin_ego"), EgoEquipPacket::encode, EgoEquipPacket::decode);
+        assertRoundTrip(new EgoEquipPacket(4, ""), EgoEquipPacket::encode, EgoEquipPacket::decode);
+        // 槽位是否合法由服务端业务判断，编解码不能把 -1 变成有效槽位。
+        assertRoundTrip(new EgoEquipPacket(-1, "unknown"), EgoEquipPacket::encode, EgoEquipPacket::decode);
+    }
+
+    @Test
+    void egoLoadoutSyncPacket() {
+        assertRoundTrip(new EgoLoadoutSyncPacket(new String[]{"", "", "", "", ""}),
+                EgoLoadoutSyncPacket::encode, EgoLoadoutSyncPacket::decode);
+        assertRoundTrip(new EgoLoadoutSyncPacket(new String[]{"test_zayin_ego", "", "", "", "test_aleph_ego"}),
+                EgoLoadoutSyncPacket::encode, EgoLoadoutSyncPacket::decode);
+        assertRoundTrip(new EgoLoadoutSyncPacket(new String[]{"ember_watch", "", "", "", ""}, new String[]{"ember_watch"}),
+                EgoLoadoutSyncPacket::encode, EgoLoadoutSyncPacket::decode);
+        assertThrows(IllegalArgumentException.class, () -> new EgoLoadoutSyncPacket(new String[0]));
+    }
+
+    @Test
+    void releaseRequestsPreserveBothForms() {
+        assertRoundTrip(new EgoReleasePacket("test_zayin_ego", false),
+                EgoReleasePacket::encode, EgoReleasePacket::decode);
+        assertRoundTrip(new EgoReleasePacket("test_aleph_ego", true),
+                EgoReleasePacket::encode, EgoReleasePacket::decode);
+    }
+
+    @Test
+    void oversizedEgoRequestIdsAreRejected() {
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            buffer.writeVarInt(0);
+            buffer.writeUtf("x".repeat(129));
+            assertThrows(io.netty.handler.codec.DecoderException.class, () -> EgoEquipPacket.decode(buffer));
+            buffer.clear();
+            buffer.writeUtf("x".repeat(129));
+            buffer.writeBoolean(false);
+            assertThrows(io.netty.handler.codec.DecoderException.class, () -> EgoReleasePacket.decode(buffer));
+        } finally {
+            buffer.release();
+        }
     }
 
     private static <T> void assertRoundTrip(T packet, Encoder<T> encoder, Function<FriendlyByteBuf, T> decoder) {

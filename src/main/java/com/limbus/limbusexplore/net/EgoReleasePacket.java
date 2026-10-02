@@ -1,5 +1,6 @@
 package com.limbus.limbusexplore.net;
 
+import com.limbus.limbusexplore.ego.EgoLoadout;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -19,21 +20,23 @@ public class EgoReleasePacket {
     }
 
     public static void encode(EgoReleasePacket packet, FriendlyByteBuf buffer) {
-        buffer.writeUtf(packet.egoId);
+        buffer.writeUtf(packet.egoId, EgoLoadout.MAX_ID_LENGTH);
         buffer.writeBoolean(packet.corroded);
     }
 
     public static EgoReleasePacket decode(FriendlyByteBuf buffer) {
-        return new EgoReleasePacket(buffer.readUtf(), buffer.readBoolean());
+        return new EgoReleasePacket(buffer.readUtf(EgoLoadout.MAX_ID_LENGTH), buffer.readBoolean());
     }
 
     public static void handle(EgoReleasePacket packet, Supplier<NetworkEvent.Context> context) {
-        context.get().enqueueWork(() -> {
-            ServerPlayer player = context.get().getSender();
+        NetworkEvent.Context ctx = context.get();
+        ctx.enqueueWork(() -> {
+            ServerPlayer player = ctx.getSender();
             if (player == null) {
                 return;
             }
             EgoReleaseService.handle(player, packet.egoId, packet.corroded);
         });
+        ctx.setPacketHandled(true);
     }
 }

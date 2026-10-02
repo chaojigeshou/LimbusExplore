@@ -61,6 +61,7 @@ public final class Chaos {
             return false;
         }
         value = Math.max(0, value - amount);
+        regenTimer = 0;
         return value <= 0;
     }
 
@@ -84,6 +85,7 @@ public final class Chaos {
         chaosTicks = 0;
         regenTimer = 0;
         hasLock = false;
+        notifiedSecond = -1;
     }
 
     /** 非混乱状态下的缓慢自然回复；返回 true 表示自动回复该同步了 */
@@ -128,6 +130,7 @@ public final class Chaos {
     }
 
     public void copyFrom(Chaos other) {
+        reset();
         this.value = other.value;
         this.chaosTicks = other.chaosTicks;
     }
@@ -140,8 +143,9 @@ public final class Chaos {
     }
 
     public void load(CompoundTag tag) {
-        value = tag.contains("value") ? tag.getInt("value") : MAX;
-        chaosTicks = tag.getInt("chaosTicks");
+        reset();
+        set(tag.contains("value") ? tag.getInt("value") : MAX);
+        chaosTicks = Math.max(0, Math.min(CHAOS_TICKS, tag.getInt("chaosTicks")));
         if (value <= 0) {
             value = MAX;   // 读档时别直接卡在 0
         }

@@ -1,0 +1,4 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {"layer0": "limbusexplore:hud/sin_wrath"}
+}

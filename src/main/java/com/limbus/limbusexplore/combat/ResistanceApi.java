@@ -116,6 +116,7 @@ public final class ResistanceApi {
         if (resistance == null) {
             return;
         }
+        applyTags(entity, resistance);
         ModNetworking.sendToPlayer(player, new ResistanceSyncPacket(
                 resistance.get(DamageKind.SLASH),
                 resistance.get(DamageKind.PIERCE),

@@ -3,6 +3,7 @@ package com.limbus.limbusexplore.ego;
 import com.limbus.limbusexplore.net.EgoStateSyncPacket;
 import com.limbus.limbusexplore.net.ModNetworking;
 import com.limbus.limbusexplore.sin.SinApi;
+import com.limbus.limbusexplore.combat.ResistanceApi;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
@@ -42,23 +43,28 @@ public final class EgoStateApi {
         return state == null ? 0 : state.remainingSeconds(System.currentTimeMillis());
     }
 
-    /** 释放成功后调用：先触发 beforeEnter，再写入状态。 */
+    /** 可信服务端直接进入状态的入口，不执行瞬时技能；普通释放应调用 EgoApi。 */
     public static void enter(ServerPlayer player, Ego ego, boolean corroded) {
         EgoState state = of(player);
         if (state == null) {
             return;
         }
+        state.enter(ego, corroded, System.currentTimeMillis());
+        onStarted(player, ego, corroded);
+    }
+
+    /** 事务已提交；只通知一次开始，不重放瞬时技能。 */
+    static void onStarted(ServerPlayer player, Ego ego, boolean corroded) {
         for (EgoStateListener listener : LISTENERS) {
             listener.beforeEnter(player, ego, corroded);
         }
-        state.enter(ego, corroded, System.currentTimeMillis());
         sync(player);
     }
 
     /** 结束状态：负值资源归 0，触发 onEnd。 */
     public static void end(ServerPlayer player) {
         EgoState state = of(player);
-        if (state == null) {
+        if (state == null || !state.hasState()) {
             return;
         }
         Ego ego = state.activeEgo();
@@ -71,11 +77,28 @@ public final class EgoStateApi {
         sync(player);
     }
 
+    /** 登录/换维/释放前恢复临时覆盖；离线已过期时执行结束清理。 */
+    public static void reconcile(ServerPlayer player) {
+        EgoState state = of(player);
+        if (state == null) return;
+        if (state.isActive(System.currentTimeMillis())) {
+            Ego ego = state.activeEgo();
+            ResistanceApi.setOverride(player, ego.resistanceKind, ego.resistanceRate);
+        } else if (state.hasState()) {
+            end(player);
+        } else {
+            // 兼容旧版本读档时先清掉状态、却留下负资源和抗性覆盖的存档。
+            SinApi.normalizeNegative(player);
+            var resistance = ResistanceApi.of(player);
+            if (resistance != null && resistance.hasOverride()) ResistanceApi.clearOverride(player);
+        }
+    }
+
     /** 每 tick 调用一次（PlayerTickEvent 服务端）：到点结束，每秒回调 whileInState + 同步。 */
     public static void tick(ServerPlayer player) {
         EgoState state = of(player);
         if (state == null || !state.isActive(System.currentTimeMillis())) {
-            if (state != null && state.activeEgo() != null) {
+            if (state != null && state.hasState()) {
                 end(player);
             }
             return;
